@@ -99,7 +99,7 @@ void loop()
 {
   updateHeartRate();
 
-  // simulateDynamicBPM();
+  simulateDynamicBPM();
 
   if (!baselineReady)
   {
