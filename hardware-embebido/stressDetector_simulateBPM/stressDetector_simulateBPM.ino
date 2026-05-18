@@ -2,7 +2,8 @@
 // SIMULACIÓN DE PULSO + CONTROL DE MOTOR
 // =====================================================
 
-const int motor1pin = 11;
+const int[] motors = {A0, A1, A2, A3, A6, A7}; // A4 y A5 reservados para sensor
+const int motorsNumber = 1;
 
 // -----------------------------
 // SIMULADOR DE PULSO
@@ -87,7 +88,9 @@ void setup()
   Serial.begin(115200);
   Serial.println("Simulador de pulso iniciado");
 
-  pinMode(motor1pin, OUTPUT);
+  for(int i = 0; i<motorsNumber; i++){
+    pinMode(motors[i], OUTPUT);
+  }
 
   randomSeed(analogRead(0));
 }
@@ -99,7 +102,7 @@ void loop()
 {
   updateHeartRate();
 
-  // simulateDynamicBPM();
+  simulateDynamicBPM();
 
   if (!baselineReady)
   {
@@ -302,23 +305,50 @@ void runPattern(StressLevel level)
   switch (level)
   {
     case LEVEL_REASSURE:
-      analogWrite(motor1pin, 0);
+      
       break;
 
     case LEVEL_AWARENESS:
-      analogWrite(motor1pin, 50);
+      // Prende cada motor un segundo
+      Serial.println("Iniciando patron AWARENESS");
+      for(int i = 0; i<motorsNumber; i++){
+        analogWrite(motors[i], 50);
+        delay(1000);
+        analogWrite(motors[i], 0);
+      }
       break;
 
     case LEVEL_BREATH:
-      analogWrite(motor1pin, 75);
+      // prende todos los motores una vez ascendentemente
+      Serial.println("Iniciando patron BREATH");
+      for(int i=0; i<motorsNumber; i++){
+        for(int j=0; j<255; j++){
+          analogWrite(motors[i], j);
+          delay(10);
+        }
+        analogWrite(motors[i], 0);
+      }
       break;
 
     case LEVEL_CALM_DOWN:
-      analogWrite(motor1pin, 100);
-      break;
+      // prende todos los motores un segundo 3 veces
+      Serial.println("Iniciando patron CALM DOWN");
+      for(int i=0; i<3; i++){
+        for(int j = 0; j<motorsNumber; j++){
+          analogWrite(motors[j], 50);
+          delay(50);
+        }
+        break;
+        delay(1000);
+        for(int j = 0; j<motorsNumber; j++){
+          analogWrite(motors[j], 0);
+        }
+      }
 
     default:
-      analogWrite(motor1pin, 0);
+      for(int i=0; i<motorsNumber; i++){
+        analogWrite(motors[i], 0);
+      }
       break;
   }
 }
