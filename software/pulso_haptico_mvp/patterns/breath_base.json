@@ -1,0 +1,122 @@
+{
+  "pattern_id": "breath_base_01",
+  "name": "Breath Base 01",
+  "description": "Patrón base de guía respiratoria breve para acompañar una activación moderada con expansión y descenso vibrotáctil.",
+  "tags": [
+    "breath",
+    "breathing_guide",
+    "paced_regulation"
+  ],
+  "context": {
+    "stress_level": "moderate",
+    "policy": "breath"
+  },
+  "semantic": {
+    "intended_effect": "invitar a una pausa respiratoria sin imponer una corrección brusca",
+    "rationale": "El patrón crece de manera progresiva, sostiene un instante y desciende, ofreciendo una forma temporal fácilmente asociable a inhalar, sostener y exhalar. La pausa evita saturación táctil.",
+    "co_design_status": "draft",
+    "tested_with_users": false,
+    "sensory_metaphor": "ola lenta"
+  },
+  "device": {
+    "layout": "bracelet_linear_6",
+    "channels": 6
+  },
+  "playback": {
+    "mode": "repeat",
+    "repeat_count": 3,
+    "cooldown_ms": 500
+  },
+  "adjustable_params": {
+    "intensity_scale": {
+      "min": 0.75,
+      "max": 1.25,
+      "default": 1.0
+    },
+    "duration_scale": {
+      "min": 0.75,
+      "max": 1.3,
+      "default": 1.0
+    },
+    "allow_repeat_override": true
+  },
+  "steps": [
+    {
+      "duration_ms": 700,
+      "channels": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.38,
+      "transition": "ramp_up"
+    },
+    {
+      "duration_ms": 700,
+      "channels": [
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "intensity": 0.48,
+      "transition": "ramp_up"
+    },
+    {
+      "duration_ms": 500,
+      "channels": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "intensity": 0.52,
+      "transition": "hold"
+    },
+    {
+      "duration_ms": 900,
+      "channels": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "intensity": 0.52,
+      "transition": "ramp_down"
+    },
+    {
+      "duration_ms": 600,
+      "channels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.0,
+      "transition": "pause"
+    }
+  ],
+  "constraints": {
+    "must_include_pause": true,
+    "avoid_semantic_overlap": [
+      "alarm",
+      "correction",
+      "awareness",
+      "calm_down"
+    ],
+    "body_target": "arm_grid_2x3",
+    "max_total_duration_ms": 5000
+  },
+  "notes": "Versión base para una guía temporal respiratoria de baja complejidad. La duración puede ajustarse al ritmo respiratorio preferido."
+}
