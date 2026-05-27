@@ -41,7 +41,7 @@ pip install -r requirements.txt
 3. Ejecutar la app:
 
 ```bash
-python pc_haptic_app.py --port COM5 --catalog patterns
+python pc_haptic_app.py --port COM9 --catalog patterns
 ```
 
 En Linux puede ser:
@@ -55,7 +55,7 @@ Si no se indica `--port`, la app lista los puertos disponibles.
 ## Personalización desde CLI
 
 ```bash
-python pc_haptic_app.py --port COM5 --catalog patterns   --intensity-scale awareness=1.15   --duration-scale breath=1.25   --repeat-count calm_down=3
+python pc_haptic_app.py --port COM9 --catalog patterns   --intensity-scale awareness=1.15   --duration-scale breath=1.25   --repeat-count calm_down=3
 ```
 
 La app indica si envía patrón `BASE` o `PERSONALIZADA`.

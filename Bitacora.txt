@@ -1,0 +1,7 @@
+1. Arranca despues de 3 o 4 segundos 
+2. No usar el sensor cuando esta iniciando 
+3. Creemos que si se le hace demasiada presion al sensor deja de funcionar 
+4. Parece que la protoboard no anda bien, el cable de 3V hay que pegarlo a la conexion mas cercana al arduino
+o tira el error de revisar conexiones 
+	i. Protoboard de metal: (negativo para adentro) 57 fila (donde iria el A0) no funciona
+5. Ejecutar la app de python desde powershell, no con git bash

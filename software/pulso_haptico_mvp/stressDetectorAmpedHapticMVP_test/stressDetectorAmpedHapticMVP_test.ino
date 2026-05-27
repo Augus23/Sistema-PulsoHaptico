@@ -323,6 +323,7 @@ void updateHeartRate()
   lastPulseSampleMs = now;
 
   rawSignal = analogRead(PULSE_PIN);
+  //Serial.println(rawSignal);
 
   if (firstSignalSample)
   {
@@ -388,8 +389,6 @@ void resetSignalWindow(int value)
 
 void detectBeatFromAnalogSignal(unsigned long now)
 {
-  // Cruce ascendente del umbral alto.
-  // La histéresis se completa esperando luego que baje de thresholdLow.
   if (!aboveThreshold && smoothSignal > thresholdHigh)
   {
     aboveThreshold = true;
@@ -402,33 +401,29 @@ void detectBeatFromAnalogSignal(unsigned long now)
 
     unsigned long ibi = now - lastBeat;
 
-    // Evita doble conteo de picos demasiado cercanos.
-    if (ibi < MIN_VALID_IBI_MS)
-    {
-      return;
-    }
-
-    // Si pasó demasiado tiempo, reiniciamos referencia pero no calculamos BPM.
-    if (ibi > MAX_VALID_IBI_MS)
-    {
+    if (ibi < MIN_VALID_IBI_MS) return;
+    if (ibi > MAX_VALID_IBI_MS) {
       lastBeat = now;
       return;
     }
 
-    beatsPerMinute = 60000.0 / ibi;
+    // SOLUCIÓN: Forzar un cálculo float preciso usando UL en el numerador
+    beatsPerMinute = 60000.0f / (float)ibi; 
 
+    // Guardar solo si está dentro del rango fisiológico real
     if (beatsPerMinute >= MIN_VALID_BPM && beatsPerMinute <= MAX_VALID_BPM)
     {
-      addRateSample((byte)beatsPerMinute);
-      beatAvg = averageRates();
+      byte bpmByte = (byte)beatsPerMinute;
+      if (bpmByte > 0) { // Evita registrar un cero por error de casteo
+        addRateSample(bpmByte);
+        beatAvg = averageRates();
+      }
 
       digitalWrite(LED, HIGH);
       lastBeat = now;
     }
   }
 
-  // Cruce descendente del umbral bajo.
-  // Recién ahí habilitamos detectar un nuevo latido.
   if (aboveThreshold && smoothSignal < thresholdLow)
   {
     aboveThreshold = false;

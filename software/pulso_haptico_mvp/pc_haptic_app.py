@@ -487,6 +487,7 @@ def main() -> int:
     try:
         while True:
             raw = ser.readline()
+            #print(raw)
             if not raw:
                 continue
 
