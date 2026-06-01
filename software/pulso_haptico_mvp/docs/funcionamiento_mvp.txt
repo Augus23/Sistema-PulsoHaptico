@@ -9,9 +9,25 @@ Flujo del programa:
 		5.3: Si el nuevo nivel de estrés difiere del anterior, actualiza el nivel actual
 		5.4: Imprime la telemetría
 
+## Cómo la app de Python recibe datos
 
+La aplicación establece conexión con el Arduino utilizando un puerto serie mediante el cual se transmite la información de manera bidireccional, bit a bit.
+Luego de abrir la conexión serial, se resetea el buffer de input para vaciarlo y se informa en pantalla que la conexión fue establecida correctamente.
 
+El código emplea un loop para leer constantemente la información enviada desde el Arduino. 
+Una vez leídos los datos los decodifica y limpia, transformándolos de byte a string y haciendo uso de medidas de seguridad para reemplazar los bytes corruptos, en caso de que hubiera, por signos de interrogación.
+Cuando se termina de realizar la limpieza de los datos se imprime en pantalla la telemetría recibida, con un formato que varía dependiendo de si la lectura es utilizada para calcular el baseline o no.
 
+## Cómo la app de Python elige una política
+
+Si la telemetría corresponde a la fase de inferencia y hay buena señal, la aplicación verifica el modo de procesamiento de política. 
+En el caso de que esté en modo "arduino", devuelve la política determinada por el código Arduino, siempre y cuando exista en su propia lista de políticas.
+Por otro lado, si el modo es "pc", la aplicación elige una política de acuerdo a sus propios criterios. Para llevar esto a cabo extrae el valor del bpm suavizado y del baseline bpm de la telemtría recibida con el objetivo de calcular el delta (diferencia entre los latidos actuales y los latidos en reposo).
+Una vez calculado el delta, elige una política en base a este valor: 
+* delta >= 33 -> elige la política calm down
+* delta >= 19 -> elige la política breath
+* delta >= 9 -> elige la política awareness
+* delta < 9 -> elige la política reassure
 
 ## Como se traduce un patron JSON a datos enviados por USB
 
