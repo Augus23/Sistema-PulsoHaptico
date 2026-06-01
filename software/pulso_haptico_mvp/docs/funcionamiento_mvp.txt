@@ -18,6 +18,43 @@ Una vez calculado el delta, elige una política en base a este valor:
 * delta >= 9 -> elige la política awareness
 * delta < 9 -> elige la política reassure
 
+## Cómo se calcula el BPM
+
+1. Arduino lee la señal analógica proveniente del Pulse Sensor Amped cada 10 ms
+2. La señal se suaviza mediante un filtro exponencial para reducir ruido
+3. Cada 3 segundos se calcula la amplitud observada entre el valor mínimo y máximo de la señal
+4. Si la amplitud es suficiente, se generan dos umbrales dinámicos:
+   - `thresholdHigh = windowMin + amplitud × 0.60`
+   - `thresholdLow = windowMin + amplitud × 0.40`
+5. Un latido se detecta cuando la señal supera el umbral alto
+6. Para evitar doble conteo, la señal debe volver a bajar por debajo del umbral bajo antes de permitir una nueva detección
+7. Cuando se detectan dos latidos consecutivos se calcula el IBI (Inter Beat Interval)
+8. El BPM se obtiene mediante la fórmula: `BPM = 60000 / IBI`
+9. Si el BPM calculado está fuera del rango fisiológico permitido (40 a 180 BPM), se descarta
+10. Los BPM válidos se almacenan en un buffer circular de 8 muestras
+11. El BPM final utilizado por el sistema (`beatAvg`) se obtiene promediando dichas muestras
+
+---
+
+## Cómo se determina y comunica el estado
+
+1. Durante los primeros 3 minutos se obtiene la línea base (baseline) del usuario
+2. Cada segundo se almacena una muestra de `beatAvg`
+3. Al finalizar la medición se calcula la mediana de todas las muestras obtenidas
+4. El resultado se almacena como `baselineBpm` y representa el BPM de referencia personal del usuario
+5. Una vez obtenido el baseline, el sistema comienza a evaluar el estado fisiológico
+6. Cada segundo se almacena el `beatAvg` en una ventana deslizante de 15 segundos
+7. Se calcula la mediana de dicha ventana y se obtiene `smoothBpm`
+8. Se calcula la diferencia respecto al baseline: `delta = smoothBpm - baselineBpm`
+9. Según el valor de delta se determina el nivel actual:
+   - `delta < 9` → **reassure** (incluye valores negativos: el usuario está más tranquilo que su baseline)
+   - `delta entre 9 y 18` → **awareness**
+   - `delta entre 19 y 32` → **breath**
+   - `delta >= 33` → **calm_down**
+10. Si el nivel actual es **diferente al nivel anterior** (`currentLevel != lastEventLevel`), Arduino emite el evento: `EVT,policy_change`
+11. La aplicación Python recibe dicho evento y envía el patrón háptico correspondiente a la política detectada
+12. Además, Arduino envía periódicamente telemetría mediante mensajes `TEL` para informar BPM, baseline, delta, nivel y política actual
+
 ## Como se traduce un patron JSON a datos enviados por USB
 
 Los patrones hapticos se almacenan en formato JSON en la PC para poder editarlos facilmente
