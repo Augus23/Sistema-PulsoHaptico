@@ -1,14 +1,3 @@
-Flujo del programa: 
-	1. Actualización del pulso: 
-	2. Manejo del patrón que recibe de la app de python
-	3. Reproduce un paso del patrón??
-	4. Si no está listo el baseline, lo calcula
-	5. Una vez que el baseline está listo:
-		5.1: Suaviza la señal obtenida
-		5.2: Clasifica el nivel de estrés
-		5.3: Si el nuevo nivel de estrés difiere del anterior, actualiza el nivel actual
-		5.4: Imprime la telemetría
-
 ## Cómo la app de Python recibe datos
 
 La aplicación establece conexión con el Arduino utilizando un puerto serie mediante el cual se transmite la información de manera bidireccional, bit a bit.
