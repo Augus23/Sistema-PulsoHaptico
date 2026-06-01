@@ -69,7 +69,39 @@
 // 3) Ejecutar la app Python en la PC con el puerto correcto.
 //
 // =====================================================
-
+// Cómo se mide BPM
+// ----------------
+// Se lee el sensor cada 10 ms y se suaviza la señal con un filtro
+// exponencial. Cada 3 s se recalculan umbrales dinámicos sobre el
+// mínimo y máximo observados. Un latido se detecta por cruce de
+// umbral con histéresis para evitar doble conteo. El BPM se promedia
+// en un buffer circular de 8 muestras.
+// El tiempo entre dos latidos consecutivos (IBI, Inter Beat Interval)
+// se utiliza para calcular la frecuencia cardíaca:
+//
+//   BPM = 60000 / IBI
+//
+// donde IBI está expresado en milisegundos.
+//
+// Para reducir falsos positivos causados por ruido o detecciones
+// erróneas, el sistema descarta valores fuera del rango fisiológico
+// aceptado (40 a 180 BPM).
+//
+// Clasificación de estado
+// -----------------------
+// La detección pasa por tres capas:
+//   1) Baseline: mediana del BPM en reposo, medida durante 3 minutos
+//      al inicio. Es la referencia personal del usuario.
+//   2) smoothBpm: mediana de los últimos 15 segundos de beatAvg.
+//      Amortigua picos breves y reacciona solo a cambios sostenidos.
+//   3) delta = smoothBpm - baselineBpm, mapeado a cuatro niveles:
+//        < 9        reassure
+//        9..18      awareness
+//        19..32     breath
+//        >= 33      calm_down
+//
+// Cuando el nivel cambia, Arduino emite EVT,policy_change y la app
+// en la PC envía el patrón háptico correspondiente.
 
 // -----------------------------
 // Configuración Pulse Sensor Amped
@@ -310,6 +342,11 @@ void loop()
 // =====================================================
 // ACTUALIZACIÓN DE BPM DESDE PULSE SENSOR AMPED
 // =====================================================
+// Flujo: updateHeartRate() muestrea y suaviza la señal, recalcula
+// umbrales cada 3 s y llama a detectBeatFromAnalogSignal() cuando
+// la señal es confiable. Cada latido válido agrega un valor al
+// buffer circular; beatAvg es el promedio de ese buffer y es la
+// salida que usan las etapas siguientes.
 
 void updateHeartRate()
 {
@@ -386,6 +423,12 @@ void resetSignalWindow(int value)
 }
 
 
+
+// Detecta latidos por histéresis entre dos umbrales.
+// Cruce ascendente de thresholdHigh -> cuenta el latido y calcula IBI.
+// El siguiente latido solo se habilita cuando la señal baja de
+// thresholdLow. Sin esta espera, un pico ruidoso en la cima
+// se contaría dos veces.
 void detectBeatFromAnalogSignal(unsigned long now)
 {
   // Cruce ascendente del umbral alto.
@@ -482,6 +525,11 @@ void resetRateBuffer()
 // =====================================================
 // MEDICIÓN DE LÍNEA BASE
 // =====================================================
+// collectBaseline() toma 1 muestra/s de beatAvg durante 3 minutos
+// y al final calcula baselineBpm como mediana. Este valor es la
+// referencia personal del usuario y no cambia durante la sesión.
+// Sin baseline listo, classifyStressLevel() no opera.
+
 
 void collectBaseline()
 {
@@ -561,6 +609,10 @@ int medianBaseline()
 // =====================================================
 // BPM SUAVIZADO PARA CLASIFICACIÓN
 // =====================================================
+// updateSmoothedBpm() mantiene una ventana deslizante de 15 s.
+// smoothBpm es la mediana de esa ventana: entrada directa a
+// classifyStressLevel(). Amortigua picos breves y reacciona
+// solo a cambios sostenidos.
 
 void updateSmoothedBpm()
 {
@@ -621,7 +673,16 @@ int medianSmooth()
 // =====================================================
 // CLASIFICACIÓN POR BPM RELATIVO
 // =====================================================
+// classifyStressLevel() calcula delta = smoothBpm - baselineBpm
+// y lo mapea a un nivel. Cuando el nivel cambia, el loop principal
+// llama a printPolicyChangeEvent() que emite EVT,policy_change
+// por serial para que la app en la PC envíe el patrón háptico.
 
+
+
+// Compara smoothBpm contra baselineBpm y devuelve el nivel de activación.
+// Requiere al menos 5 muestras en la ventana para evitar clasificar
+// prematuramente al inicio de la detección.
 StressLevel classifyStressLevel()
 {
   if (!signalOK)
