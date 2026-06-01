@@ -17,7 +17,7 @@ Flujo del programa:
 
 Los patrones hapticos se almacenan en formato JSON en la PC para poder editarlos facilmente
 
-Como Arduino Nano tiene recursoso limitados, por lo que la PC convierte cada patron JSON en un protocolo serial compacto antes de enviarlo por USB
+Como Arduino Nano tiene recursos limitados, por lo que la PC convierte cada patron JSON en un protocolo serial compacto antes de enviarlo por USB
 
 La funcion responsable de la traduccion es: build_effective_pattern():
 
@@ -26,7 +26,7 @@ La funcion responsable de la traduccion es: build_effective_pattern():
 			1.3) duration_Overrides -> Personalizaciones de duracion
 			1.4) repeat_Overrides -> personalizaciones de repeticiones
 2) Identifica la politica usando: policy = pattern["context"]["policy"]
-3) Se leen los limites definidos en el JSON (Cosasque se pueden personalizar y cosas que no): adjustable = pattern ["adjustable_params"]
+3) Se leen los limites definidos en el JSON (Cosas que se pueden personalizar y cosas que no): adjustable = pattern ["adjustable_params"]
 4) Se aplican las personalizaciones pedidas por el usuario, si el usuario no pidio ninguna se usan las del JSON por defecto
 5) Como arduino recibe numeros se convierte la politica a valores numericos (codigo)
 6) Se crea la primera linea del protocolo: PATTERN {politica, personalizado, repeticiones, Cooldown, Pasos}
@@ -45,13 +45,13 @@ Importante: Los Steps son instrucciones que forman un patron haptico (pasos de u
 
 ## Como Arduino ejecuta la vibracion
 
-1) el arduino recibe el patron y guarda los datos
-2) luego le llega los pasos a hacer del patron y con END se termina la comunicacion
-3) en el loop se ejecuta el updateHapticPlayback(), para ir actualizando los valores
-	3.1) toma el paso actual
-	3.2) calcula el tiempo que paso
-	3.3) y calcula el pwm a usar (constante, ir subiendo gradualmente, ir bajando gradualmete)
-4) activamos los motores que queremos usar y a la intensidad que queremos
-5) una vez que se termina de ejecutar el paso, se pasa al siguiente
-6) esto se repite por cuantos pasos tenga el patron y repeticiones de estos
-7) una vez que termina, se apagan todos los motores
+1) El arduino recibe el patron y guarda los datos
+2) Luego le llega los pasos a hacer del patron y con END se termina la comunicacion
+3) En el loop se ejecuta el updateHapticPlayback(), para ir actualizando los valores
+	3.1) Toma el paso actual
+	3.2) Calcula el tiempo que paso
+	3.3) Y calcula el pwm a usar (constante, ir subiendo gradualmente, ir bajando gradualmete)
+4) Activamos los motores que queremos usar y a la intensidad que queremos
+5) Una vez que se termina de ejecutar el paso, se pasa al siguiente
+6) Esto se repite por cuantos pasos tenga el patron y repeticiones de estos
+7) Una vez que termina, se apagan todos los motores
