@@ -72,6 +72,10 @@
 
 
 // -----------------------------
+// Ensure language servers recognise Arduino symbols
+#include <Arduino.h>
+
+// -----------------------------
 // Configuración Pulse Sensor Amped
 // -----------------------------
 
@@ -105,7 +109,7 @@ float thresholdLow = 0;
 unsigned long signalWindowStartMs = 0;
 
 bool signalOK = false;
-bool aboveThreshold = false;
+bool aboveThreshold = false; // Determina si la señal es usable dado que superó un umbral
 
 // -----------------------------
 // Cálculo de BPM
@@ -280,30 +284,32 @@ void loop()
 {
   // Mantener estas funciones no bloqueantes permite medir pulso,
   // recibir comandos y ejecutar vibraciones al mismo tiempo.
-  updateHeartRate();
+  updateHeartRate(); // Gestión del pulso
   handleSerialInput();
   updateHapticPlayback();
 
   if (!baselineReady)
   {
+    /* Se obtiene la base a partir de la cual se calculan los cambios de nivel */
     collectBaseline();
   }
   else
   {
-    updateSmoothedBpm();
-    currentLevel = classifyStressLevel();
+    /* Si ya se tiene la base, se procesa el bpm, activan patrones e imprime telemetría */
+    updateSmoothedBpm(); // Obtención del pulso suavizado
+    currentLevel = classifyStressLevel(); // Obtención del nivel de estrés actual
 
     // Evento inmediato cuando cambia el nivel/política.
     if (currentLevel != lastEventLevel)
     {
       lastEventLevel = currentLevel;
       printPolicyChangeEvent();
-      printAppTelemetry(true);
+      printAppTelemetry(true); // imprime forzosamente telemetría
     }
   }
 
   // Telemetría periódica para la app.
-  printAppTelemetry(false);
+  printAppTelemetry(false); // imprime telemetría solo si se cumple el tiempo
 }
 
 
@@ -322,8 +328,11 @@ void updateHeartRate()
 
   lastPulseSampleMs = now;
 
-  rawSignal = analogRead(PULSE_PIN);
+  rawSignal = analogRead(PULSE_PIN); // toma el pulso del sensor
 
+  /* Si es el primer pulso sensado se usa para
+  inicializar el filtro y la ventana de señales
+   */
   if (firstSignalSample)
   {
     smoothSignal = rawSignal;
@@ -335,51 +344,64 @@ void updateHeartRate()
   // Suficiente para reducir ruido sin borrar demasiado el pulso.
   smoothSignal = 0.70 * smoothSignal + 0.30 * rawSignal;
 
-  updateSignalWindow(rawSignal);
+  updateSignalWindow(rawSignal); // Actualiza el rango de la ventana
 
   // Cada SIGNAL_WINDOW_MS recalculamos amplitud y umbrales.
   if (now - signalWindowStartMs >= SIGNAL_WINDOW_MS)
   {
-    signalAmplitude = windowMax - windowMin;
+    signalAmplitude = windowMax - windowMin; // amplitud basada en el rango de la ventana
 
     if (signalAmplitude >= MIN_VALID_AMPLITUDE)
     {
+      /* Si la amplitud supera un mínimo establecido se establecen 2 umbrales 
+      La señal es usable */
       thresholdHigh = windowMin + signalAmplitude * 0.60;
       thresholdLow  = windowMin + signalAmplitude * 0.40;
       signalOK = true;
     }
     else
     {
+      /* Si no hay señal usable, evitamos seguir arrastrando BPM viejo. 
+      Reseteamos el buffer de <>
+      */
       signalOK = false;
-      aboveThreshold = false;
+      aboveThreshold = false; // señal definida como no usable
       digitalWrite(LED, LOW);
-
-      // Si no hay señal usable, evitamos seguir arrastrando BPM viejo.
+ 
       resetRateBuffer();
     }
 
-    resetSignalWindow(rawSignal);
+    resetSignalWindow(rawSignal); // Reseteo de ventana de señales ¿Para qué en cada iteración?
+    // Replantearse si reubicarla o quitarla
   }
 
-  // Si todavía no tenemos señal confiable, no detectamos latidos.
+  /* Si todavía no tenemos señal confiable, no detectamos latidos. */
   if (!signalOK)
   {
     return;
   }
 
+  // Detección de pulso. Se realiza si hay señal confiable
   detectBeatFromAnalogSignal(now);
 }
 
 
 void updateSignalWindow(int value)
 {
+  /*
+  Si el valor excede el rango de la ventana, incrementa la misma
+  */
   if (value < windowMin) windowMin = value;
   if (value > windowMax) windowMax = value;
 }
 
-// resetea la ventana al valor por parametro y guarda cuando la actualizó
+
 void resetSignalWindow(int value)
 {
+  /*
+  Setea la ventana con el rango de valores de señales al valor recibido y
+  Almacena el timestamp de cuándo lo hizo
+  */
   windowMin = value;
   windowMax = value;
   signalWindowStartMs = millis();
@@ -389,7 +411,12 @@ void resetSignalWindow(int value)
 void detectBeatFromAnalogSignal(unsigned long now)
 {
   // Cruce ascendente del umbral alto.
-  // La histéresis se completa esperando luego que baje de thresholdLow.
+  // La histéresis se completa esperando luego que baje de thresholdLow.}
+
+  /* Si la señal no es usable y la señal suavizada supera al threshold superior
+  Creo que actualiza interpreta que pasa a ser usable? y avanza con la captura del pulso
+  Si smoothSignal > thresholdHigh implica -->
+  */
   if (!aboveThreshold && smoothSignal > thresholdHigh)
   {
     aboveThreshold = true;
@@ -400,7 +427,7 @@ void detectBeatFromAnalogSignal(unsigned long now)
       return;
     }
 
-    unsigned long ibi = now - lastBeat;
+    unsigned long ibi = now - lastBeat; // ?
 
     // Evita doble conteo de picos demasiado cercanos.
     if (ibi < MIN_VALID_IBI_MS)
@@ -415,6 +442,9 @@ void detectBeatFromAnalogSignal(unsigned long now)
       return;
     }
 
+    /* A partir de acá se guarda un beat sample si se encuentra en un rango
+    Pero no se interpreta si el valor que usa es del pulso */
+
     beatsPerMinute = 60000.0 / ibi;
 
     if (beatsPerMinute >= MIN_VALID_BPM && beatsPerMinute <= MAX_VALID_BPM)
@@ -427,8 +457,10 @@ void detectBeatFromAnalogSignal(unsigned long now)
     }
   }
 
-  // Cruce descendente del umbral bajo.
+  // Cruce descendente del umbral bajo. <-- Qué significa?
   // Recién ahí habilitamos detectar un nuevo latido.
+
+  // Si smoothSignal < thresholdHigh implica --> 
   if (aboveThreshold && smoothSignal < thresholdLow)
   {
     aboveThreshold = false;
@@ -439,9 +471,13 @@ void detectBeatFromAnalogSignal(unsigned long now)
 
 void addRateSample(byte bpm)
 {
-  rates[rateSpot] = bpm;
-  rateSpot = (rateSpot + 1) % RATE_SIZE;
+  /* Agrega un sample de pulso a un arreglo */
 
+  rates[rateSpot] = bpm;
+  rateSpot = (rateSpot + 1) % RATE_SIZE; // Guarda en anillo (del último índice pasa al primero)
+
+  /* Incrementa rate count solo si el buffer no está lleno
+  Si lo está simplemente sobreescribe la posición */
   if (rateCount < RATE_SIZE)
   {
     rateCount++;
@@ -451,6 +487,7 @@ void addRateSample(byte bpm)
 
 int averageRates()
 {
+  /* Calcula promedio de los sample rates */
   if (rateCount == 0) return 0;
 
   int sum = 0;
@@ -466,6 +503,7 @@ int averageRates()
 
 void resetRateBuffer()
 {
+  /* Resetea el buffer de sample rates */
   rateSpot = 0;
   rateCount = 0;
   lastBeat = 0;
@@ -566,8 +604,8 @@ void updateSmoothedBpm()
 {
   unsigned long now = millis();
 
-  bool fingerPresent = signalOK;
-  bool bpmAvailable = beatAvg > 0;
+  bool fingerPresent = signalOK; // Hay o no señal válida
+  bool bpmAvailable = beatAvg > 0; // Se recibe pulso
 
   if (!fingerPresent || !bpmAvailable)
   {
@@ -579,6 +617,7 @@ void updateSmoothedBpm()
   {
     lastSmoothSampleMs = now;
 
+    /* Se rellena el buffer de samples suavizados. Si está lleno se sobreescriben*/
     smoothSamples[smoothIndex] = (byte)beatAvg;
     smoothIndex = (smoothIndex + 1) % SMOOTH_WINDOW_SECONDS;
 
@@ -587,13 +626,14 @@ void updateSmoothedBpm()
       smoothCount++;
     }
 
-    smoothBpm = medianSmooth();
+    smoothBpm = medianSmooth(); // Obtención de la media
   }
 }
 
 
 int medianSmooth()
 {
+  /* Calcula la media de todos los samples suavizados */
   if (smoothCount == 0) return 0;
 
   byte temp[SMOOTH_WINDOW_SECONDS];
@@ -638,6 +678,7 @@ StressLevel classifyStressLevel()
 
   int delta = smoothBpm - baselineBpm;
 
+  /* Obtención del nivel de estres */
   if (delta >= 33)
   {
     return LEVEL_CALM_DOWN;
@@ -842,6 +883,7 @@ void printPolicyChangeEvent()
 
 void handleSerialInput()
 {
+  /* Función que gestiona el input recibido desde el programa de Python*/
   while (Serial.available() > 0)
   {
     char c = (char)Serial.read();
@@ -855,14 +897,17 @@ void handleSerialInput()
     {
       serialBuffer[serialBufferIndex] = '\0';
 
+    
       if (serialBufferIndex > 0)
       {
+        /* Genera respuesta al input recibido cuando se detecta salto de linea "\n" */
         parseSerialLine(serialBuffer);
       }
 
       serialBufferIndex = 0;
     }
     else
+    /* Sino, se rellena el buffer mientras haya espacio*/
     {
       if (serialBufferIndex < SERIAL_BUFFER_SIZE - 1)
       {
@@ -871,7 +916,7 @@ void handleSerialInput()
       }
       else
       {
-        // Línea demasiado larga: descartamos para no desbordar memoria.
+        /* Si no hay espacio se descarta*/
         serialBufferIndex = 0;
         Serial.println(F("ERR,line_too_long"));
       }
@@ -881,6 +926,7 @@ void handleSerialInput()
 
 
 void parseSerialLine(char* line)
+/* Generación de respuesta al input según mensaje recibido*/
 {
   if (strcmp(line, "PING") == 0)
   {
@@ -1105,13 +1151,13 @@ void updateHapticPlayback()
 
   unsigned long now = millis();
 
-  if (playbackInCooldown)
+  if (playbackInCooldown) // ?
   {
     if (now - playbackCooldownStartMs >= activePattern.cooldownMs)
     {
-      playbackInCooldown = false;
-      playbackStepIndex = 0;
-      playbackStepStartMs = now;
+      playbackInCooldown = false; //
+      playbackStepIndex = 0; //
+      playbackStepStartMs = now; // 
     }
     else
     {
@@ -1119,11 +1165,11 @@ void updateHapticPlayback()
     }
   }
 
-  if (playbackStepIndex >= activePattern.stepCount)
+  if (playbackStepIndex >= activePattern.stepCount) // Si terminan los pasos se pasa a la siguiente repetición
   {
     playbackRepeatIndex++;
 
-    if (playbackRepeatIndex >= activePattern.repeatCount)
+    if (playbackRepeatIndex >= activePattern.repeatCount) // Si termina de repetirse el patrón las veces indicadas se frena
     {
       stopAllMotors();
       playbackActive = false;
@@ -1131,12 +1177,14 @@ void updateHapticPlayback()
       return;
     }
 
+    /* Si termina una repetición se reinician las variables */
     stopAllMotors();
     playbackInCooldown = true;
     playbackCooldownStartMs = now;
     return;
   }
 
+  // DE acá para abajo no se que sucede
   HapticStep step = activePattern.steps[playbackStepIndex];
   unsigned long elapsed = now - playbackStepStartMs;
 
@@ -1154,6 +1202,7 @@ void updateHapticPlayback()
 
 byte computeStepPwm(HapticStep step, unsigned long elapsed)
 {
+  /* Esta función... */
   if (step.transition == TRANSITION_PAUSE || step.pwm == 0 || step.mask == 0)
   {
     return 0;
@@ -1185,16 +1234,18 @@ byte computeStepPwm(HapticStep step, unsigned long elapsed)
 
 void applyMotorMask(byte mask, byte pwm)
 {
+  /* Si el motor está activo se activa a la potencia pwm recibida */
   for (byte i = 0; i < MOTOR_COUNT; i++)
   {
     bool active = (mask & (1 << i)) != 0;
-    analogWrite(MOTOR_PINS[i], active ? pwm : 0);
+    analogWrite(MOTOR_PINS[i], active ? pwm : 0); 
   }
 }
 
 
 void stopAllMotors()
 {
+  /* Se frenan todos los motores */
   for (byte i = 0; i < MOTOR_COUNT; i++)
   {
     analogWrite(MOTOR_PINS[i], 0);
