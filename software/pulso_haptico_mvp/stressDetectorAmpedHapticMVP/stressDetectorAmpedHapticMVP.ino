@@ -72,10 +72,6 @@
 
 
 // -----------------------------
-// Ensure language servers recognise Arduino symbols
-#include <Arduino.h>
-
-// -----------------------------
 // Configuración Pulse Sensor Amped
 // -----------------------------
 
@@ -290,12 +286,12 @@ void loop()
 
   if (!baselineReady)
   {
-    /* Se obtiene la base a partir de la cual se calculan los cambios de nivel */
+    //Se obtiene la base a partir de la cual se calculan los cambios de nivel 
     collectBaseline();
   }
   else
   {
-    /* Si ya se tiene la base, se procesa el bpm, activan patrones e imprime telemetría */
+    ///Si ya se tiene la base, se procesa el bpm, activan patrones e imprime telemetría 
     updateSmoothedBpm(); // Obtención del pulso suavizado
     currentLevel = classifyStressLevel(); // Obtención del nivel de estrés actual
 
