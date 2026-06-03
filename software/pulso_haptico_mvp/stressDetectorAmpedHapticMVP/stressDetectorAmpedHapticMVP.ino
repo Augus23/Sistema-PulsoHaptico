@@ -284,7 +284,7 @@ void loop()
 {
   // Mantener estas funciones no bloqueantes permite medir pulso,
   // recibir comandos y ejecutar vibraciones al mismo tiempo.
-  updateHeartRate(); // Gestión del pulso
+  updateHeartRate(); // Lectura del sensor de pulso y determinación matemática de cuando ocurre un latido
   handleSerialInput();
   updateHapticPlayback();
 
@@ -328,6 +328,8 @@ void updateHeartRate()
 
   lastPulseSampleMs = now;
 
+
+  // -- LECTURA DEL PULSO
   rawSignal = analogRead(PULSE_PIN); // toma el pulso del sensor
 
   /* Si es el primer pulso sensado se usa para
@@ -340,13 +342,18 @@ void updateHeartRate()
     firstSignalSample = false;
   }
 
+  // -- APLICACIÓN DE FILTRO DIGIRAL PARA REDUCIR RUIDO
   // Filtro exponencial simple.
   // Suficiente para reducir ruido sin borrar demasiado el pulso.
+  // Es un filtro de paso bajo. Pondera el 70% de la inercia anterior 
+  //y 30% de la muestra nueva para suavizar el ruido de alta frecuencia
   smoothSignal = 0.70 * smoothSignal + 0.30 * rawSignal;
 
+   // Mantiene registro de máximos y mínimos en un ciclo
   updateSignalWindow(rawSignal); // Actualiza el rango de la ventana
 
   // Cada SIGNAL_WINDOW_MS recalculamos amplitud y umbrales.
+ 
   if (now - signalWindowStartMs >= SIGNAL_WINDOW_MS)
   {
     signalAmplitude = windowMax - windowMin; // amplitud basada en el rango de la ventana
@@ -362,7 +369,7 @@ void updateHeartRate()
     else
     {
       /* Si no hay señal usable, evitamos seguir arrastrando BPM viejo. 
-      Reseteamos el buffer de <>
+      Reseteamos el buffers
       */
       signalOK = false;
       aboveThreshold = false; // señal definida como no usable
@@ -371,8 +378,8 @@ void updateHeartRate()
       resetRateBuffer();
     }
 
-    resetSignalWindow(rawSignal); // Reseteo de ventana de señales ¿Para qué en cada iteración?
-    // Replantearse si reubicarla o quitarla
+    resetSignalWindow(rawSignal); // Reseteo de ventana de señales en cada ciclo
+                                  // Permite recalcular la amplitud en el siguiente ciclo
   }
 
   /* Si todavía no tenemos señal confiable, no detectamos latidos. */
@@ -427,7 +434,7 @@ void detectBeatFromAnalogSignal(unsigned long now)
       return;
     }
 
-    unsigned long ibi = now - lastBeat; // ?
+    unsigned long ibi = now - lastBeat; // inter-beat interval en ms
 
     // Evita doble conteo de picos demasiado cercanos.
     if (ibi < MIN_VALID_IBI_MS)
@@ -443,7 +450,7 @@ void detectBeatFromAnalogSignal(unsigned long now)
     }
 
     /* A partir de acá se guarda un beat sample si se encuentra en un rango
-    Pero no se interpreta si el valor que usa es del pulso */
+    Pero no se interpreta si el valor que usa es del pulso?? */
 
     beatsPerMinute = 60000.0 / ibi;
 
@@ -460,7 +467,9 @@ void detectBeatFromAnalogSignal(unsigned long now)
   // Cruce descendente del umbral bajo. <-- Qué significa?
   // Recién ahí habilitamos detectar un nuevo latido.
 
-  // Si smoothSignal < thresholdHigh implica --> 
+  // Si smoothSignal < thresholdLow implica --> la señal estuvo arriba del umbral
+  // y ahora cae por debajo del threshold bajo
+  // entonces se completa el ciclo
   if (aboveThreshold && smoothSignal < thresholdLow)
   {
     aboveThreshold = false;
@@ -474,7 +483,7 @@ void addRateSample(byte bpm)
   /* Agrega un sample de pulso a un arreglo */
 
   rates[rateSpot] = bpm;
-  rateSpot = (rateSpot + 1) % RATE_SIZE; // Guarda en anillo (del último índice pasa al primero)
+  rateSpot = (rateSpot + 1) % RATE_SIZE; // Buffer circular (del último índice pasa al primero)
 
   /* Incrementa rate count solo si el buffer no está lleno
   Si lo está simplemente sobreescribe la posición */
@@ -559,7 +568,7 @@ void collectBaseline()
 
   if ((timeCompleted && enoughSamples) || baselineCount >= MAX_BASELINE_SAMPLES)
   {
-    baselineBpm = medianBaseline();
+    baselineBpm = medianBaseline(); // obtenemos la mediana ignorando la secuencia temporal tomada
     baselineReady = true;
 
     Serial.print(F("EVT,baseline_ready,baseline_bpm="));
@@ -626,14 +635,14 @@ void updateSmoothedBpm()
       smoothCount++;
     }
 
-    smoothBpm = medianSmooth(); // Obtención de la media
+    smoothBpm = medianSmooth(); // Obtención de la mediana
   }
 }
 
 
 int medianSmooth()
 {
-  /* Calcula la media de todos los samples suavizados */
+  /* Calcula la mediana de todos los samples suavizados */
   if (smoothCount == 0) return 0;
 
   byte temp[SMOOTH_WINDOW_SECONDS];
@@ -678,7 +687,7 @@ StressLevel classifyStressLevel()
 
   int delta = smoothBpm - baselineBpm;
 
-  /* Obtención del nivel de estres */
+  /* Obtención del nivel de estres según desviación con respecto a la línea base fisiológica */
   if (delta >= 33)
   {
     return LEVEL_CALM_DOWN;
