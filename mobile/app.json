@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Haptic Flow",
+    "slug": "pulso-haptico",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "hapticflow",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0B1220"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.pulsohaptico.app"
+    },
+    "android": {
+      "package": "com.pulsohaptico.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1220"
+      }
+    },
+    "plugins": ["expo-router"]
+  }
+}

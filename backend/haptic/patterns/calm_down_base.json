@@ -1,0 +1,121 @@
+{
+  "pattern_id": "calm_down_base_01",
+  "name": "Calm Down Base 01",
+  "description": "Patrón base de descenso y contención para activación alta, con presencia amplia y final progresivamente más bajo.",
+  "tags": [
+    "calm_down",
+    "containment",
+    "deescalation"
+  ],
+  "context": {
+    "stress_level": "persistent",
+    "policy": "calm_down"
+  },
+  "semantic": {
+    "intended_effect": "favorecer descenso de activación mediante una señal amplia y predecible",
+    "rationale": "El patrón comienza con una presencia distribuida en la grilla para hacerse legible incluso en activación alta, y luego reduce intensidad y superficie para evitar transformarse en alarma o intrusión.",
+    "co_design_status": "draft",
+    "tested_with_users": false,
+    "sensory_metaphor": "manta que afloja"
+  },
+  "device": {
+    "layout": "bracelet_linear_6",
+    "channels": 6
+  },
+  "playback": {
+    "mode": "repeat",
+    "repeat_count": 2,
+    "cooldown_ms": 800
+  },
+  "adjustable_params": {
+    "intensity_scale": {
+      "min": 0.65,
+      "max": 1.1,
+      "default": 1.0
+    },
+    "duration_scale": {
+      "min": 0.8,
+      "max": 1.35,
+      "default": 1.0
+    },
+    "allow_repeat_override": true
+  },
+  "steps": [
+    {
+      "duration_ms": 450,
+      "channels": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "intensity": 0.62,
+      "transition": "ramp_up"
+    },
+    {
+      "duration_ms": 550,
+      "channels": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "intensity": 0.62,
+      "transition": "hold"
+    },
+    {
+      "duration_ms": 500,
+      "channels": [
+        0,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "intensity": 0.48,
+      "transition": "ramp_down"
+    },
+    {
+      "duration_ms": 500,
+      "channels": [
+        0,
+        0,
+        1,
+        1,
+        0,
+        0
+      ],
+      "intensity": 0.36,
+      "transition": "ramp_down"
+    },
+    {
+      "duration_ms": 700,
+      "channels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.0,
+      "transition": "pause"
+    }
+  ],
+  "constraints": {
+    "must_include_pause": true,
+    "avoid_semantic_overlap": [
+      "alarm",
+      "correction",
+      "awareness"
+    ],
+    "body_target": "arm_grid_2x3",
+    "max_total_duration_ms": 4500
+  },
+  "notes": "Versión base de contención y descenso. Conviene iniciar con intensidad moderada y bajar si se percibe invasiva."
+}
