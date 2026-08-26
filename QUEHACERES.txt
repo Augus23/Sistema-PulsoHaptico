@@ -1,0 +1,22 @@
+LISTA DE COSAS A HACER O DECIDIR
+
+1. Front End para la muestra
+	a. Front end con opciones de configuración de pulso que envíe mensajes al archivo .py 
+		--> Idea más sencilla
+		* Actividad: Desarrollar aplicación web
+
+	b. Aplicación móvil con opciones de configuración que envía mensajes al archivo .py
+		--> 
+		* Actividad: Desarrollar aplicación móvil (hecho en rama aplicacionPH)
+		* Conexión entre móvil - app con WebSockets o HTTP (mini backend)
+
+
+2. Detalle del Front End
+
+* Opciones de configuración de la policy
+* Visualización del pulso actual
+
+
+3. UX en la muestra
+
+* Medir el pulso por poco tiempo (15s - 20s) y utilizar eso como base
