@@ -1,0 +1,122 @@
+{
+  "pattern_id": "awareness_base_01",
+  "name": "Awareness Base 01",
+  "description": "Patrón base de señalamiento temprano para hacer perceptible un cambio relevante de activación sin inducir todavía una acción correctiva o de descenso.",
+  "tags": [
+    "awareness",
+    "early_notice",
+    "subtle_signal"
+  ],
+  "context": {
+    "stress_level": "light",
+    "policy": "awareness"
+  },
+  "semantic": {
+    "intended_effect": "hacer perceptible un cambio relevante de activación sin corregir todavía",
+    "rationale": "El patrón construye una marcación breve, localizada y sobria que ayuda a registrar una deriva de activación sin competir con la tarea principal ni sentirse como contención o guía respiratoria.",
+    "co_design_status": "draft",
+    "tested_with_users": false,
+    "sensory_metaphor": "subrayado"
+  },
+  "device": {
+    "layout": "bracelet_linear_6",
+    "channels": 6
+  },
+  "playback": {
+    "mode": "one_shot",
+    "repeat_count": 1,
+    "cooldown_ms": 1200
+  },
+  "adjustable_params": {
+    "intensity_scale": {
+      "min": 0.8,
+      "max": 1.2,
+      "default": 1.0
+    },
+    "duration_scale": {
+      "min": 0.85,
+      "max": 1.15,
+      "default": 1.0
+    },
+    "allow_repeat_override": true
+  },
+  "steps": [
+    {
+      "duration_ms": 160,
+      "channels": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.38,
+      "transition": "ramp_up"
+    },
+    {
+      "duration_ms": 140,
+      "channels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.42,
+      "transition": "hold"
+    },
+    {
+      "duration_ms": 120,
+      "channels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.0,
+      "transition": "pause"
+    },
+    {
+      "duration_ms": 160,
+      "channels": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "intensity": 0.38,
+      "transition": "ramp_up"
+    },
+    {
+      "duration_ms": 140,
+      "channels": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "intensity": 0.42,
+      "transition": "ramp_down"
+    }
+  ],
+  "constraints": {
+    "must_include_pause": true,
+    "avoid_semantic_overlap": [
+      "alarm",
+      "breathing_guide",
+      "containment",
+      "calm_down"
+    ],
+    "body_target": "arm_grid_2x3",
+    "max_total_duration_ms": 1500
+  },
+  "notes": "Versión base orientada a detección temprana y marcación localizada; candidata para validación semántica antes de traducir a formato de firmware."
+}

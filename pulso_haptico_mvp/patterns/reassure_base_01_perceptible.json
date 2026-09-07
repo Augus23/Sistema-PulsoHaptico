@@ -1,0 +1,123 @@
+{
+  "pattern_id": "reassure_base_01",
+  "name": "Reassure Base 01",
+  "description": "Patrón base de confirmación suave y perceptible para señalar que la activación se mantiene dentro de un rango esperable.",
+  "tags": [
+    "reassure",
+    "stable_state",
+    "gentle_confirmation",
+    "perceptible_baseline"
+  ],
+  "context": {
+    "stress_level": "none",
+    "policy": "reassure"
+  },
+  "semantic": {
+    "intended_effect": "confirmar estabilidad sin capturar la atención principal",
+    "rationale": "El patrón usa dos apoyos vibrotáctiles breves y espaciados, uno proximal y otro distal, con intensidad moderada y un sostén corto para superar el umbral perceptivo del prototipo. Evita parecer alarma, corrección o guía respiratoria: comunica una presencia discreta, corporalmente reconocible y no intrusiva.",
+    "co_design_status": "draft_perceptual_test",
+    "tested_with_users": false,
+    "sensory_metaphor": "toque de acompañamiento"
+  },
+  "device": {
+    "layout": "bracelet_linear_6",
+    "channels": 6
+  },
+  "playback": {
+    "mode": "one_shot",
+    "repeat_count": 1,
+    "cooldown_ms": 2000
+  },
+  "adjustable_params": {
+    "intensity_scale": {
+      "min": 0.6,
+      "max": 1.6,
+      "default": 1.0
+    },
+    "duration_scale": {
+      "min": 0.7,
+      "max": 1.6,
+      "default": 1.0
+    },
+    "allow_repeat_override": true
+  },
+  "steps": [
+    {
+      "duration_ms": 180,
+      "channels": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.52,
+      "transition": "ramp_up"
+    },
+    {
+      "duration_ms": 360,
+      "channels": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.52,
+      "transition": "hold"
+    },
+    {
+      "duration_ms": 320,
+      "channels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "intensity": 0.0,
+      "transition": "pause"
+    },
+    {
+      "duration_ms": 180,
+      "channels": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1
+      ],
+      "intensity": 0.52,
+      "transition": "ramp_up"
+    },
+    {
+      "duration_ms": 360,
+      "channels": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1
+      ],
+      "intensity": 0.52,
+      "transition": "hold"
+    }
+  ],
+  "constraints": {
+    "must_include_pause": true,
+    "avoid_semantic_overlap": [
+      "alarm",
+      "breathing_guide",
+      "correction",
+      "calm_down"
+    ],
+    "body_target": "arm_grid_2x3",
+    "max_total_duration_ms": 1600
+  },
+  "notes": "Versión ajustada luego de pruebas de actuación: el patrón original era demasiado leve para el prototipo, con PWM efectivo cercano a 61-70 y sin hold perceptual. Esta versión busca una confirmación suave pero claramente detectable. Para pruebas manuales, usar --manual-policy reassure --manual-repeat --resend-after 4; luego bajar intensidad si resulta demasiado presente."
+}
