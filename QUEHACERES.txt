@@ -4,19 +4,44 @@ LISTA DE COSAS A HACER O DECIDIR
 	a. Front end con opciones de configuración de pulso que envíe mensajes al archivo .py 
 		--> Idea más sencilla
 		* Actividad: Desarrollar aplicación web
+		+- Más sencillo pero menos llamativo
 
 	b. Aplicación móvil con opciones de configuración que envía mensajes al archivo .py
 		--> 
 		* Actividad: Desarrollar aplicación móvil (hecho en rama aplicacionPH)
 		* Conexión entre móvil - app con WebSockets o HTTP (mini backend)
+		+- Más complejo pero más interactivo
+
+
+
+
 
 
 2. Detalle del Front End
 
-* Opciones de configuración de la policy
 * Visualización del pulso actual
+* Opciones de configuración de la policy
+
+
+
+
+
 
 
 3. UX en la muestra
 
-* Medir el pulso por poco tiempo (15s - 20s) y utilizar eso como base
+1. Medir el pulso por poco tiempo (15s - 20s) y mostrarlo en una aplicación en tiempo real
+2. Simulación de momento de uso de la aplicación
+	* No importa el baseline, solo importan ejecutar los patrones
+	* Opciones:
+		1. Simulación real: escenario 1 --> escenario 2 --> .. --> escenario n
+		2. Poder elegir escenario a mano
+
+
+
+
+DUDAS:
+¿Qué computadora vamos a usar? ¿Una nuestra o nos van a dar una desde el laboratorio?
+¿Qué pasa si tenemos mucho tiempo el sensor prendido? La expo dura varias horas y lo van a usar muchas personas ¿Otro sensor?
+
+
