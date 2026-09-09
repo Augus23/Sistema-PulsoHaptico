@@ -42,7 +42,7 @@
   },
   "steps": [
     {
-      "duration_ms": 160,
+      "duration_ms": 300,
       "channels": [
         1,
         0,
@@ -51,11 +51,11 @@
         0,
         0
       ],
-      "intensity": 0.38,
+      "intensity": 0.60,
       "transition": "ramp_up"
     },
     {
-      "duration_ms": 140,
+      "duration_ms": 300,
       "channels": [
         0,
         1,
@@ -64,11 +64,11 @@
         0,
         0
       ],
-      "intensity": 0.42,
+      "intensity": 0.60,
       "transition": "hold"
     },
     {
-      "duration_ms": 120,
+      "duration_ms": 200,
       "channels": [
         0,
         0,
@@ -81,7 +81,7 @@
       "transition": "pause"
     },
     {
-      "duration_ms": 160,
+      "duration_ms": 300,
       "channels": [
         0,
         0,
@@ -90,11 +90,11 @@
         0,
         0
       ],
-      "intensity": 0.38,
+      "intensity": 0.6,
       "transition": "ramp_up"
     },
     {
-      "duration_ms": 140,
+      "duration_ms": 300,
       "channels": [
         0,
         0,
@@ -103,7 +103,7 @@
         1,
         0
       ],
-      "intensity": 0.42,
+      "intensity": 0.6,
       "transition": "ramp_down"
     }
   ],
