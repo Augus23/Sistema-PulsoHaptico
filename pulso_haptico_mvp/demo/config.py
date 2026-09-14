@@ -33,4 +33,4 @@ TRANSITION_TO_CODE = {
 }
 
 VALID_POLICIES = ["reassure", "awareness", "breath", "calm_down"]
-DEMO_STEP_DURATION_SEC = 30.0
+DEMO_STEP_DURATION_SEC = 15.0

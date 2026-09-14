@@ -4,6 +4,8 @@ import threading
 import math
 import time
 import serial.tools.list_ports as list_ports
+from demo.protocol import parse_telemetry_line, build_effective_pattern
+
 
 def choose_port_interactively() -> Optional[str]:
     ports = list(list_ports.comports())
