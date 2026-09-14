@@ -20,6 +20,31 @@ def choose_port_interactively() -> Optional[str]:
     return ports[idx].device
 
 
+def display_received_telemetry(telemetry: Dict[str, str]) -> None:
+    """Muestra en consola sólo lo importante para la maqueta."""
+    phase = telemetry.get("phase", "?")
+    if phase == "baseline":
+        print(
+            "[BPM] fase=baseline "
+            f"signal_ok={telemetry.get('signal_ok')} "
+            f"bpm={telemetry.get('bpm')} "
+            f"beat_avg={telemetry.get('beat_avg')} "
+            f"muestras={telemetry.get('baseline_samples')} "
+            f"elapsed_s={telemetry.get('elapsed_s', '-')}"
+        )
+    elif phase == "run":
+        print(
+            "[BPM] fase=run "
+            f"bpm={telemetry.get('bpm')} "
+            f"beat_avg={telemetry.get('beat_avg')} "
+            f"smooth_bpm={telemetry.get('smooth_bpm')} "
+            f"baseline={telemetry.get('baseline_bpm')} "
+            f"delta={telemetry.get('delta')} "
+            f"policy_rx={telemetry.get('policy')} "
+            f"playback={telemetry.get('playback')}"
+        )
+
+
 # =============================================================================
 # SIMULADOR DE ARDUINO (MOCK SERIAL)
 # =============================================================================
@@ -131,6 +156,8 @@ class SerialWorkerThread(threading.Thread):
                 telemetry = parse_telemetry_line(line)
                 if telemetry and self.on_telemetry_received:
                     self.on_telemetry_received(telemetry)
+                    self.log(f"[RX] {telemetry}")
+                   # display_received_telemetry(telemetry)
 
             except Exception as e:
                 self.log(f"[ERROR READ] {e}")
