@@ -1,3 +1,10 @@
+from typing import Optional, Any, Dict, List, Callable
+from serial import Serial
+import threading
+import math
+import time
+import serial.tools.list_ports as list_ports
+
 def choose_port_interactively() -> Optional[str]:
     ports = list(list_ports.comports())
     if not ports:

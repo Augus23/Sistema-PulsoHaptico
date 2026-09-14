@@ -1,3 +1,7 @@
+from dataclasses import dataclass
+from typing import List, Dict, Any
+
+
 @dataclass
 class EffectivePattern:
     policy: str
