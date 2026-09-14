@@ -36,26 +36,67 @@ class MockArduinoSerial:
         self.lock = threading.Lock()
         self.running = True
         self.baseline_bpm = 70
+        self.current_delta = 0.0
+        self._target_delta = 0.0
+        self.delta_step_value = 0.5
         
         # Hilo de generación de telemetría falsa
         self.telemetry_thread = threading.Thread(target=self._generate_telemetry, daemon=True)
         self.telemetry_thread.start()
+
+    @property
+    def target_delta(self) -> float:
+        return self._target_delta
+
+    @target_delta.setter
+    def target_delta(self, value: float) -> None:
+        self._target_delta = value
+        # Calculamos el paso lineal para que llegue al objetivo un poco antes (13.5s)
+        # Esto compensa los delays del time.sleep y asegura que cruce el umbral a tiempo
+        self.delta_step_value = abs(self._target_delta - self.current_delta) / 13.5
+        if self.delta_step_value < 0.5:
+            self.delta_step_value = 0.5
 
     def _generate_telemetry(self):
         t = 0
         while self.running:
             time.sleep(1.0)
             t += 1
-            # Oscilación simulada de BPM entre 65 y 105
-            simulated_bpm = int(75 + 20 * math.sin(t / 5.0))
-            smooth_bpm = int(73 + 18 * math.sin((t - 2) / 5.0))
-            delta = smooth_bpm - self.baseline_bpm
+            
+            with self.lock:
+                if self.current_delta < self._target_delta:
+                    self.current_delta = min(self._target_delta, self.current_delta + self.delta_step_value)
+                elif self.current_delta > self._target_delta:
+                    self.current_delta = max(self._target_delta, self.current_delta - self.delta_step_value)
+                delta = int(self.current_delta)
+
+            smooth_bpm = self.baseline_bpm + delta
+            # Oscilación simulada leve de BPM
+            simulated_bpm = smooth_bpm + int(3 * math.sin(t))
+
+            # Clasificación de acuerdo a reglas del sketch de Arduino
+            if delta >= 33:
+                pol = "calm_down"
+                pol_code = 4
+                lvl = "activacion_alta"
+            elif delta >= 19:
+                pol = "breath"
+                pol_code = 3
+                lvl = "activacion_moderada"
+            elif delta >= 9:
+                pol = "awareness"
+                pol_code = 2
+                lvl = "activacion_leve"
+            else:
+                pol = "reassure"
+                pol_code = 1
+                lvl = "regulacion_estable"
 
             line = (
                 f"TEL,phase=run,raw=512,smooth_signal=510.0,amp=150,signal_ok=1,"
                 f"bpm={simulated_bpm}.0,beat_avg={simulated_bpm},smooth_bpm={smooth_bpm},"
                 f"baseline_bpm={self.baseline_bpm},delta={delta},"
-                f"level=regulacion_estable,policy=reassure,policy_code=1,playback=0\n"
+                f"level={lvl},policy={pol},policy_code={pol_code},playback=0\n"
             )
             
             with self.lock:

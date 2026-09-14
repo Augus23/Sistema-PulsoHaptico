@@ -19,6 +19,7 @@ class DemoOrchestrator(threading.Thread):
         self.on_tick_cb = on_tick_cb
         self.running = False
         self.current_policy_index = 0
+        self.policy_changed_event = threading.Event()
 
     def start_demo(self) -> None:
         if not self.running:
@@ -30,15 +31,60 @@ class DemoOrchestrator(threading.Thread):
         self.running = False
 
     def run(self) -> None:
+        direction = 1  # 1 = subiendo, -1 = bajando
+        
         while self.running:
-            policy = VALID_POLICIES[self.current_policy_index]
-            self.worker.send_policy(policy)
-            self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
+            # Identificar en qué política estamos basándonos en el UI
+            current_active = self.worker.ser.target_delta if hasattr(self.worker.ser, "target_delta") else 0
+            
+            is_mock = hasattr(self.worker.ser, "target_delta")
+            if is_mock:
+                current_d = getattr(self.worker.ser, "current_delta", 0.0)
+                
+                # Máquina de estados para subir y bajar lentamente
+                if current_d >= 33.5:
+                    direction = -1
+                elif current_d <= 8.5:
+                    direction = 1
+
+                if direction == 1:
+                    if current_d < 9.0:
+                        if current_d < 2.0:
+                            # Arrancando desde cero (fresh start). Toma 15s llegar a 9.0.
+                            self.worker.ser.target_delta = 9.0
+                        else:
+                            # Rebote desde el fondo (estaba estacionado en 8.0). Sube rápido a Awareness.
+                            self.worker.ser.target_delta = 19.0
+                    elif current_d < 19.0:
+                        self.worker.ser.target_delta = 19.0
+                    elif current_d < 33.0:
+                        self.worker.ser.target_delta = 33.0
+                    else:
+                        # Llegamos a Calm Down. Nos quedamos justito arriba del umbral.
+                        self.worker.ser.target_delta = 34.0
+                else:
+                    if current_d > 33.0:
+                        # Arrancando desde Calm Down hacia abajo.
+                        self.worker.ser.target_delta = 18.5
+                    elif current_d > 19.0:
+                        self.worker.ser.target_delta = 18.5
+                    elif current_d > 9.0:
+                        self.worker.ser.target_delta = 8.5
+                    else:
+                        # Llegamos a Reassure. Nos quedamos justito abajo del umbral.
+                        self.worker.ser.target_delta = 8.0
+            else:
+                policy = VALID_POLICIES[self.current_policy_index]
+                self.worker.send_policy(policy)
+                self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
 
             start_time = time.time()
             while time.time() - start_time < DEMO_STEP_DURATION_SEC:
                 if not self.running:
                     return
+                if self.policy_changed_event.is_set():
+                    self.policy_changed_event.clear()
+                    break
                 remaining = int(DEMO_STEP_DURATION_SEC - (time.time() - start_time))
                 self.on_tick_cb(remaining)
                 time.sleep(0.2)
@@ -211,6 +257,19 @@ class HapticDemoApp(tk.Tk):
                 self.lbl_bpm.config(text=f"BPM: {data.get('bpm', '--')}")
                 self.lbl_smooth.config(text=f"Smooth BPM: {data.get('smooth_bpm', '--')}")
                 self.lbl_delta.config(text=f"Delta: {data.get('delta', '--')}")
+                
+                # Check if we should automatically transition the policy based on mock telemetry
+                if self.auto_var.get() and hasattr(self.worker.ser, "target_delta"):
+                    suggested_policy = data.get("policy")
+                    current_active = self.lbl_active_policy.cget("text")
+                    current_policy = current_active.split(": ")[-1].lower() if ": " in current_active else ""
+                    
+                    if suggested_policy and suggested_policy in VALID_POLICIES and suggested_policy != current_policy:
+                        self.worker.send_policy(suggested_policy)
+                        self._update_auto_ui(suggested_policy)
+                        if self.orchestrator:
+                            self.orchestrator.policy_changed_event.set()
+
         self.after(0, _update)
 
     def append_log(self, text: str) -> None:
