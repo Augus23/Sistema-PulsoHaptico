@@ -184,10 +184,10 @@ class HapticDemoApp(tk.Tk):
         self.lbl_bpm = tk.Label(tel_frame, text="BPM: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
         self.lbl_bpm.grid(row=0, column=0, padx=15, pady=5)
 
-        self.lbl_smooth = tk.Label(tel_frame, text="Smooth BPM: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
+        self.lbl_smooth = tk.Label(tel_frame, text="Undefined: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
         self.lbl_smooth.grid(row=0, column=1, padx=15, pady=5)
 
-        self.lbl_delta = tk.Label(tel_frame, text="Delta: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
+        self.lbl_delta = tk.Label(tel_frame, text="Undefined: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
         self.lbl_delta.grid(row=0, column=2, padx=15, pady=5)
 
         self.lbl_active_policy = tk.Label(tel_frame, text="Política Activa: NINGUNA", font=("Arial", 12, "bold"), bg="#222831", fg="#00ADB5")
@@ -253,10 +253,16 @@ class HapticDemoApp(tk.Tk):
 
     def update_telemetry(self, data: Dict[str, str]) -> None:
         def _update():
-            if data.get("phase") == "run":
+            # Solo mostrar datos si la señal es válida (baseline_samples > 0)
+            signal_ok = data.get("signal_ok")
+            if signal_ok == "1":
                 self.lbl_bpm.config(text=f"BPM: {data.get('bpm', '--')}")
-                self.lbl_smooth.config(text=f"Smooth BPM: {data.get('smooth_bpm', '--')}")
-                self.lbl_delta.config(text=f"Delta: {data.get('delta', '--')}")
+                if(data.get("phase") == "run"):
+                    self.lbl_smooth.config(text=f"Baseline: {data.get('baseline_bpm', '--')}")
+                    self.lbl_delta.config(text=f"Delta: {data.get('delta', '--')}")
+                else:
+                    self.lbl_smooth.config(text=f"Beat average: {data.get('beat_avg', '--')}")
+                    self.lbl_delta.config(text=f"Samples: {data.get('baseline_samples', '--')}")
                 
                 # Check if we should automatically transition the policy based on mock telemetry
                 if self.auto_var.get() and hasattr(self.worker.ser, "target_delta"):
