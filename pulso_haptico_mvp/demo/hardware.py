@@ -5,6 +5,7 @@ import math
 import time
 import serial.tools.list_ports as list_ports
 from demo.protocol import parse_telemetry_line, build_effective_pattern
+from demo.config import DEMO_STEP_DURATION_SEC
 
 
 def choose_port_interactively() -> Optional[str]:
@@ -78,7 +79,10 @@ class MockArduinoSerial:
         self._target_delta = value
         # Calculamos el paso lineal para que llegue al objetivo un poco antes (13.5s)
         # Esto compensa los delays del time.sleep y asegura que cruce el umbral a tiempo
-        self.delta_step_value = abs(self._target_delta - self.current_delta) / 13.5
+        
+        #transition_time = max(1.0, DEMO_STEP_DURATION_SEC * 0.9)
+        self.delta_step_value = abs(self._target_delta - self.current_delta) / DEMO_STEP_DURATION_SEC
+
         if self.delta_step_value < 0.5:
             self.delta_step_value = 0.5
 

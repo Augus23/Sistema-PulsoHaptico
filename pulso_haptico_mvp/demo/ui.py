@@ -5,6 +5,7 @@ from demo.hardware import SerialWorkerThread
 from demo.config import VALID_POLICIES, DEMO_STEP_DURATION_SEC
 import threading
 import time
+import math
 
 
 
@@ -85,7 +86,7 @@ class DemoOrchestrator(threading.Thread):
                 if self.policy_changed_event.is_set():
                     self.policy_changed_event.clear()
                     break
-                remaining = int(DEMO_STEP_DURATION_SEC - (time.time() - start_time))
+                remaining = int(math.ceil(DEMO_STEP_DURATION_SEC - (time.time() - start_time)))
                 self.on_tick_cb(remaining)
                 time.sleep(0.2)
 
@@ -137,7 +138,7 @@ class HapticDemoApp(tk.Tk):
 
         self.auto_var = tk.BooleanVar(value=False)
         self.auto_check = tk.Checkbutton(
-            auto_frame, text=f"Modo Secuencia Automática {DEMO_STEP_DURATION_SEC}", variable=self.auto_var,
+            auto_frame, text=f"Modo Secuencia Automática ({DEMO_STEP_DURATION_SEC}s)", variable=self.auto_var,
             font=("Arial", 11, "bold"), bg="#393E46", fg="#EEEEEE",
             selectcolor="#222831", activebackground="#393E46", activeforeground="#00ADB5",
             command=self.toggle_auto_mode
