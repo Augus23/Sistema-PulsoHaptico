@@ -137,7 +137,7 @@ class HapticDemoApp(tk.Tk):
 
         self.auto_var = tk.BooleanVar(value=False)
         self.auto_check = tk.Checkbutton(
-            auto_frame, text="Modo Secuencia Automática (30s)", variable=self.auto_var,
+            auto_frame, text=f"Modo Secuencia Automática {DEMO_STEP_DURATION_SEC}", variable=self.auto_var,
             font=("Arial", 11, "bold"), bg="#393E46", fg="#EEEEEE",
             selectcolor="#222831", activebackground="#393E46", activeforeground="#00ADB5",
             command=self.toggle_auto_mode
@@ -271,9 +271,12 @@ class HapticDemoApp(tk.Tk):
                     current_policy = current_active.split(": ")[-1].lower() if ": " in current_active else ""
                     
                     if suggested_policy and suggested_policy in VALID_POLICIES and suggested_policy != current_policy:
+                        # Si venimos de un estado donde no había política (al iniciar), no interrumpimos el timer inicial
+                        is_initial_sync = current_policy not in VALID_POLICIES
+                        
                         self.worker.send_policy(suggested_policy)
                         self._update_auto_ui(suggested_policy)
-                        if self.orchestrator:
+                        if self.orchestrator and not is_initial_sync:
                             self.orchestrator.policy_changed_event.set()
 
         self.after(0, _update)
