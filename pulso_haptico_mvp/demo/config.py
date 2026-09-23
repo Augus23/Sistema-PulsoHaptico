@@ -32,5 +32,5 @@ TRANSITION_TO_CODE = {
     "pause": 4,
 }
 
-VALID_POLICIES = ["reassure", "awareness", "breath", "calm_down"]
+VALID_POLICIES = ["awareness", "reassure", "breath", "calm_down"]
 DEMO_STEP_DURATION_SEC = 15.0
