@@ -109,13 +109,13 @@ class MockArduinoSerial:
                 pol_code = 3
                 lvl = "activacion_moderada"
             elif delta >= 9:
-                pol = "awareness"
-                pol_code = 2
-                lvl = "activacion_leve"
-            else:
                 pol = "reassure"
                 pol_code = 1
                 lvl = "regulacion_estable"
+            else:
+                pol = "awareness"
+                pol_code = 2
+                lvl = "activacion_leve"
 
             line = (
                 f"TEL,phase=run,raw=512,smooth_signal=510.0,amp=150,signal_ok=1,"
