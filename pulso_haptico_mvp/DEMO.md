@@ -8,7 +8,10 @@ Este documento contiene las instrucciones paso a paso para ejecutar el entorno d
 
 * **Python 3.8** o superior instalado en el sistema.
 * Puerto USB disponible y microcontrolador cargado con el firmware (en caso de realizar pruebas con hardware real).
-
+* Tkinter instalado
+```bash
+sudo apt update && sudo apt install -y python3-tk
+```
 ---
 
 ## 🛠️ Instalación y Configuración del Entorno Virtual
