@@ -36,3 +36,10 @@ TRANSITION_TO_CODE = {
 SEQUENTIAL_POLICIES = ["awareness", "reassure", "breath", "calm_down"]
 VALID_POLICIES = SEQUENTIAL_POLICIES.copy()
 DEMO_STEP_DURATION_SEC = 15.0
+
+SEQUENTIAL_SIMULATION = {
+    "awareness": {"bpm": 68, "amplitude": 8},
+    "reassure": {"bpm": 82, "amplitude": 14},
+    "breath": {"bpm": 101, "amplitude": 24},
+    "calm_down": {"bpm": 124, "amplitude": 36},
+}

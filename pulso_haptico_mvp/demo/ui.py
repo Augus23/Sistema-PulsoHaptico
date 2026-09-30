@@ -1,5 +1,6 @@
 import threading
 import time
+import math
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
@@ -7,7 +8,12 @@ import customtkinter as ctk
 import tkinter as tk
 from PIL import Image
 
-from demo.config import DEMO_STEP_DURATION_SEC, SEQUENTIAL_POLICIES, VALID_POLICIES
+from demo.config import (
+    DEMO_STEP_DURATION_SEC,
+    SEQUENTIAL_POLICIES,
+    SEQUENTIAL_SIMULATION,
+    VALID_POLICIES,
+)
 from demo.hardware import SerialWorkerThread
 
 
@@ -39,34 +45,14 @@ class DemoOrchestrator(threading.Thread):
         self.running = False
 
     def run(self) -> None:
-        direction = 1
         while self.running:
+            policy = SEQUENTIAL_POLICIES[self.current_policy_index]
             if hasattr(self.worker.ser, "target_delta"):
-                current_delta = getattr(self.worker.ser, "current_delta", 0.0)
-                if current_delta >= 33.5:
-                    direction = -1
-                elif current_delta <= 8.5:
-                    direction = 1
-
-                if direction == 1:
-                    if current_delta < 9.0:
-                        self.worker.ser.target_delta = 9.0 if current_delta < 2.0 else 19.0
-                    elif current_delta < 19.0:
-                        self.worker.ser.target_delta = 19.0
-                    elif current_delta < 33.0:
-                        self.worker.ser.target_delta = 33.0
-                    else:
-                        self.worker.ser.target_delta = 34.0
-                elif current_delta > 19.0:
-                    self.worker.ser.target_delta = 18.5
-                elif current_delta > 9.0:
-                    self.worker.ser.target_delta = 8.5
-                else:
-                    self.worker.ser.target_delta = 8.0
+                target_deltas = {"awareness": 12.0, "reassure": 4.0, "breath": 25.0, "calm_down": 38.0}
+                self.worker.ser.target_delta = target_deltas[policy]
             else:
-                policy = SEQUENTIAL_POLICIES[self.current_policy_index]
                 self.worker.send_policy(policy)
-                self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
+            self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
 
             started_at = time.time()
             while time.time() - started_at < DEMO_STEP_DURATION_SEC:
@@ -93,7 +79,17 @@ class HapticDemoApp(ctk.CTk):
         self.configure(fg_color="#1a1e24")
         self.worker.on_telemetry_received = self.update_telemetry
         self.worker.on_log_message = self.append_log
+        self.ecg_bpm = 70.0
+        self.ecg_amplitude = 0.0
+        self.ecg_target_bpm = 70.0
+        self.ecg_target_amplitude = 0.0
+        self.ecg_transition_started_at = time.monotonic()
+        self.ecg_transition_from_bpm = 70.0
+        self.ecg_transition_from_amplitude = 0.0
+        self.ecg_signal_ok = False
+        self.sequential_simulation = False
         self._build_ui(is_mock)
+        self._animate_ecg()
 
     def _build_ui(self, is_mock: bool) -> None:
         if is_mock:
@@ -104,17 +100,17 @@ class HapticDemoApp(ctk.CTk):
                 fg_color="#ff9800",
                 font=("Roboto", 13, "bold"),
                 corner_radius=8,
-            ).pack(fill="x", padx=20, pady=(15, 0))
+            ).pack(fill="x", padx=20, pady=(6, 0))
 
         ctk.CTkLabel(
             self,
             text="DEMO CONTROL DE POLÍTICAS HÁPTICAS",
             font=("Roboto", 22, "bold"),
             text_color="#00ADB5",
-        ).pack(pady=(15, 10))
+        ).pack(pady=(7, 4))
 
         auto_frame = ctk.CTkFrame(self, fg_color="#2a3038", corner_radius=12)
-        auto_frame.pack(fill="x", padx=20, pady=5)
+        auto_frame.pack(fill="x", padx=20, pady=3)
         self.auto_var = tk.BooleanVar(value=False)
         ctk.CTkSwitch(
             auto_frame,
@@ -124,24 +120,24 @@ class HapticDemoApp(ctk.CTk):
             text_color="#EEEEEE",
             progress_color="#00ADB5",
             command=self.toggle_auto_mode,
-        ).pack(side="left", padx=20, pady=15)
+        ).pack(side="left", padx=15, pady=8)
         self.timer_label = ctk.CTkLabel(
-            auto_frame, text="Timer: --s", font=("Roboto", 15, "bold"), text_color="#00ADB5"
+            auto_frame, text="Timer: --s", font=("Roboto", 14, "bold"), text_color="#00ADB5"
         )
-        self.timer_label.pack(side="right", padx=20)
+        self.timer_label.pack(side="right", padx=15)
 
         button_frame = ctk.CTkFrame(
             self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        button_frame.pack(fill="x", padx=20, pady=5)
+        button_frame.pack(fill="x", padx=20, pady=3)
         ctk.CTkLabel(
             button_frame,
             text="Selección Manual de Política",
             font=("Roboto", 14, "bold"),
             text_color="#EEEEEE",
-        ).pack(pady=(10, 5))
+        ).pack(pady=(5, 2))
         button_container = ctk.CTkFrame(button_frame, fg_color="transparent")
-        button_container.pack(fill="x", padx=15, pady=5)
+        button_container.pack(fill="x", padx=12, pady=2)
 
         colors = {"reassure": "#2e7d32", "awareness": "#f9a825", "breath": "#1565c0", "calm_down": "#c62828"}
         hover_colors = {"reassure": "#1b5e20", "awareness": "#f57f17", "breath": "#0d47a1", "calm_down": "#b71c1c"}
@@ -150,13 +146,13 @@ class HapticDemoApp(ctk.CTk):
             button = ctk.CTkButton(
                 button_container,
                 text=policy.upper(),
-                font=("Roboto", 14, "bold"),
+                font=("Roboto", 13, "bold"),
                 fg_color=colors[policy],
                 hover_color=hover_colors[policy],
                 corner_radius=8,
                 command=lambda selected=policy: self.select_policy_manual(selected),
             )
-            button.pack(side="left", expand=True, fill="x", padx=8)
+            button.pack(side="left", expand=True, fill="x", padx=6)
             self.buttons[policy] = button
         ctk.CTkButton(
             button_container,
@@ -168,30 +164,46 @@ class HapticDemoApp(ctk.CTk):
             corner_radius=8,
             width=90,
             command=self.stop_playback,
-        ).pack(side="right", padx=8)
+        ).pack(side="right", padx=6)
 
         telemetry_frame = ctk.CTkFrame(
             self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        telemetry_frame.pack(fill="x", padx=20, pady=5)
-        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 16))
-        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 16))
-        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 16))
+        telemetry_frame.pack(fill="x", padx=20, pady=3)
+        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 15))
+        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 15))
+        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 15))
         for column, label in enumerate((self.lbl_bpm, self.lbl_smooth, self.lbl_delta)):
-            label.grid(row=0, column=column, padx=20, pady=10, sticky="ew")
+            label.grid(row=0, column=column, padx=12, pady=4, sticky="ew")
         self.lbl_active_policy = ctk.CTkLabel(
             telemetry_frame,
             text="Política Activa: NINGUNA",
-            font=("Roboto", 16, "bold"),
+            font=("Roboto", 15, "bold"),
             text_color="#00ADB5",
         )
-        self.lbl_active_policy.grid(row=1, column=0, columnspan=3, pady=(0, 10))
+        self.lbl_active_policy.grid(row=1, column=0, columnspan=3, pady=(0, 4))
         telemetry_frame.grid_columnconfigure((0, 1, 2), weight=1)
+
+        ctk.CTkLabel(
+            telemetry_frame,
+            text="MONITOR DE PULSO",
+            font=("Roboto", 12, "bold"),
+            text_color="#00ADB5",
+        ).grid(row=2, column=0, columnspan=3, pady=(1, 0))
+        self.ecg_canvas = tk.Canvas(
+            telemetry_frame,
+            height=100,
+            bg="#10161b",
+            highlightthickness=1,
+            highlightbackground="#2a3038",
+        )
+        self.ecg_canvas.grid(row=3, column=0, columnspan=3, padx=12, pady=(3, 7), sticky="ew")
+        telemetry_frame.grid_rowconfigure(3, weight=1)
 
         self.image_frame = ctk.CTkFrame(
             self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        self.image_frame.pack(fill="both", expand=True, padx=20, pady=(5, 20))
+        self.image_frame.pack(fill="both", expand=True, padx=20, pady=(3, 12))
         self.image_label = ctk.CTkLabel(
             self.image_frame,
             text="Selecciona una política para visualizar su estado",
@@ -225,6 +237,7 @@ class HapticDemoApp(ctk.CTk):
         if self.auto_var.get():
             self.auto_var.set(False)
             self.toggle_auto_mode()
+        self.sequential_simulation = False
         self.highlight_button(policy)
         self.worker.send_policy(policy)
         self.lbl_active_policy.configure(text=f"Política Activa: {policy.upper()}")
@@ -239,15 +252,18 @@ class HapticDemoApp(ctk.CTk):
             self.auto_var.set(False)
             self.toggle_auto_mode()
         self.worker.stop_motors()
+        self.sequential_simulation = False
         self.lbl_active_policy.configure(text="Política Activa: DETENIDO")
         self.highlight_button("")
         self.image_label.configure(image=None, text="Detenido - Sin política activa")
 
     def toggle_auto_mode(self) -> None:
         if self.auto_var.get():
+            self.sequential_simulation = True
             self.orchestrator = DemoOrchestrator(self.worker, self.on_auto_policy_change, self.on_auto_tick)
             self.orchestrator.start_demo()
         elif self.orchestrator:
+            self.sequential_simulation = False
             self.orchestrator.stop_demo()
             self.orchestrator = None
             self.timer_label.configure(text="Timer: --s")
@@ -256,6 +272,13 @@ class HapticDemoApp(ctk.CTk):
         self.after(0, lambda: self._update_auto_ui(policy))
 
     def _update_auto_ui(self, policy: str) -> None:
+        simulation = SEQUENTIAL_SIMULATION[policy]
+        self.ecg_signal_ok = True
+        self.ecg_transition_from_bpm = self.ecg_bpm
+        self.ecg_transition_from_amplitude = self.ecg_amplitude
+        self.ecg_target_bpm = float(simulation["bpm"])
+        self.ecg_target_amplitude = float(simulation["amplitude"])
+        self.ecg_transition_started_at = time.monotonic()
         self.highlight_button(policy)
         self.lbl_active_policy.configure(text=f"Política Activa (AUTO): {policy.upper()}")
         self.update_displayed_image(policy)
@@ -263,9 +286,92 @@ class HapticDemoApp(ctk.CTk):
     def on_auto_tick(self, remaining: int) -> None:
         self.after(0, lambda: self.timer_label.configure(text=f"Timer: {remaining}s"))
 
+    def _animate_ecg(self) -> None:
+        width = max(self.ecg_canvas.winfo_width(), 400)
+        height = max(self.ecg_canvas.winfo_height(), 125)
+        middle = height / 2
+        self.ecg_canvas.delete("wave")
+
+        if self.sequential_simulation:
+            elapsed = time.monotonic() - self.ecg_transition_started_at
+            progress = min(elapsed / DEMO_STEP_DURATION_SEC, 1.0)
+            self.ecg_bpm = self.ecg_transition_from_bpm + (
+                self.ecg_target_bpm - self.ecg_transition_from_bpm
+            ) * progress
+            self.ecg_amplitude = self.ecg_transition_from_amplitude + (
+                self.ecg_target_amplitude - self.ecg_transition_from_amplitude
+            ) * progress
+            self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
+            self.lbl_smooth.configure(text="Simulado")
+            self.lbl_delta.configure(text=f"Nivel: {round(self.ecg_amplitude)}")
+
+        if not self.ecg_signal_ok:
+            self.ecg_canvas.create_line(
+                0, middle, width, middle,
+                fill="#3d5960", width=2, tags="wave"
+            )
+            self.ecg_canvas.create_text(
+                width / 2, middle - 18,
+                text="Esperando una señal de pulso...",
+                fill="#71858a", font=("Roboto", 11), tags="wave"
+            )
+        else:
+            bpm = max(self.ecg_bpm, 40.0)
+            period = 60.0 / bpm
+            visible_seconds = 6.0
+            now = time.time()
+            amplitude = max(5.0, min(self.ecg_amplitude * 0.9, 38.0))
+            points = []
+
+            for x in range(0, width + 4, 4):
+                sample_time = now - visible_seconds + (x / width) * visible_seconds
+                beat_phase = (sample_time % period) / period
+                pulse = (
+                    0.14 * math.exp(-((beat_phase - 0.18) / 0.045) ** 2)
+                    - 0.16 * math.exp(-((beat_phase - 0.30) / 0.018) ** 2)
+                    + 1.00 * math.exp(-((beat_phase - 0.34) / 0.012) ** 2)
+                    - 0.30 * math.exp(-((beat_phase - 0.38) / 0.020) ** 2)
+                    + 0.28 * math.exp(-((beat_phase - 0.60) / 0.085) ** 2)
+                )
+                points.extend((x, middle - pulse * amplitude))
+
+            self.ecg_canvas.create_line(
+                *points,
+                fill="#35e0c1",
+                width=2,
+                smooth=True,
+                tags="wave",
+            )
+            self.ecg_canvas.create_line(
+                0, middle, width, middle,
+                fill="#23444a", width=1, tags="wave"
+            )
+
+        self.after(50, self._animate_ecg)
+
     def update_telemetry(self, data: Dict[str, str]) -> None:
         def update() -> None:
-            if data.get("signal_ok") != "1":
+            if self.sequential_simulation:
+                return
+            self.ecg_signal_ok = data.get("signal_ok") == "1"
+            if not self.ecg_signal_ok:
+                self.ecg_bpm = 0.0
+                self.ecg_amplitude = 0.0
+                self.lbl_bpm.configure(text="BPM: 0")
+                self.lbl_smooth.configure(text="Sin señal")
+                self.lbl_delta.configure(text="Esperando pulso")
+                return
+            try:
+                self.ecg_bpm = float(data.get("bpm") or data.get("beat_avg") or 70)
+                self.ecg_amplitude = float(data.get("amp") or 0)
+            except (TypeError, ValueError):
+                self.ecg_bpm = 70.0
+                self.ecg_amplitude = 0.0
+            if self.ecg_bpm <= 0:
+                self.ecg_signal_ok = False
+                self.lbl_bpm.configure(text="BPM: 0")
+                self.lbl_smooth.configure(text="Sin señal")
+                self.lbl_delta.configure(text="Esperando pulso")
                 return
             self.lbl_bpm.configure(text=f"BPM: {data.get('bpm', '--')}")
             if data.get("phase") == "run":

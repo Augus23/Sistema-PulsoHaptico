@@ -368,6 +368,12 @@ void updateHeartRate()
     return;
   }
 
+  // No conservar un BPM viejo si el sensor dejó de detectar latidos.
+  if (lastBeat != 0 && now - lastBeat > MAX_VALID_IBI_MS)
+  {
+    resetRateBuffer();
+  }
+
   detectBeatFromAnalogSignal(now);
 }
 
