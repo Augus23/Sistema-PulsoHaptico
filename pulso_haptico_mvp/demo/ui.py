@@ -1,18 +1,27 @@
-import tkinter as tk
-from tkinter import ttk
-from typing import Callable, Dict, Optional
-from demo.hardware import SerialWorkerThread
-from demo.config import VALID_POLICIES, DEMO_STEP_DURATION_SEC
 import threading
 import time
+from pathlib import Path
+from typing import Callable, Dict, Optional
+
+import customtkinter as ctk
+import tkinter as tk
+from PIL import Image
+
+from demo.config import DEMO_STEP_DURATION_SEC, VALID_POLICIES
+from demo.hardware import SerialWorkerThread
 
 
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
-# =============================================================================
-# ORQUESTADOR MODO AUTOMÁTICO
-# =============================================================================
+
 class DemoOrchestrator(threading.Thread):
-    def __init__(self, worker: SerialWorkerThread, on_change_cb: Callable[[str, int], None], on_tick_cb: Callable[[int], None]):
+    def __init__(
+        self,
+        worker: SerialWorkerThread,
+        on_change_cb: Callable[[str, int], None],
+        on_tick_cb: Callable[[int], None],
+    ):
         super().__init__(daemon=True)
         self.worker = worker
         self.on_change_cb = on_change_cb
@@ -24,264 +33,258 @@ class DemoOrchestrator(threading.Thread):
     def start_demo(self) -> None:
         if not self.running:
             self.running = True
-            super().__init__(daemon=True)
             self.start()
 
     def stop_demo(self) -> None:
         self.running = False
 
     def run(self) -> None:
-        direction = 1  # 1 = subiendo, -1 = bajando
-        
+        direction = 1
         while self.running:
-            # Identificar en qué política estamos basándonos en el UI
-            current_active = self.worker.ser.target_delta if hasattr(self.worker.ser, "target_delta") else 0
-            
-            is_mock = hasattr(self.worker.ser, "target_delta")
-            if is_mock:
-                current_d = getattr(self.worker.ser, "current_delta", 0.0)
-                
-                # Máquina de estados para subir y bajar lentamente
-                if current_d >= 33.5:
+            if hasattr(self.worker.ser, "target_delta"):
+                current_delta = getattr(self.worker.ser, "current_delta", 0.0)
+                if current_delta >= 33.5:
                     direction = -1
-                elif current_d <= 8.5:
+                elif current_delta <= 8.5:
                     direction = 1
 
                 if direction == 1:
-                    if current_d < 9.0:
-                        if current_d < 2.0:
-                            # Arrancando desde cero (fresh start). Toma 15s llegar a 9.0.
-                            self.worker.ser.target_delta = 9.0
-                        else:
-                            # Rebote desde el fondo (estaba estacionado en 8.0). Sube rápido a Awareness.
-                            self.worker.ser.target_delta = 19.0
-                    elif current_d < 19.0:
+                    if current_delta < 9.0:
+                        self.worker.ser.target_delta = 9.0 if current_delta < 2.0 else 19.0
+                    elif current_delta < 19.0:
                         self.worker.ser.target_delta = 19.0
-                    elif current_d < 33.0:
+                    elif current_delta < 33.0:
                         self.worker.ser.target_delta = 33.0
                     else:
-                        # Llegamos a Calm Down. Nos quedamos justito arriba del umbral.
                         self.worker.ser.target_delta = 34.0
+                elif current_delta > 19.0:
+                    self.worker.ser.target_delta = 18.5
+                elif current_delta > 9.0:
+                    self.worker.ser.target_delta = 8.5
                 else:
-                    if current_d > 33.0:
-                        # Arrancando desde Calm Down hacia abajo.
-                        self.worker.ser.target_delta = 18.5
-                    elif current_d > 19.0:
-                        self.worker.ser.target_delta = 18.5
-                    elif current_d > 9.0:
-                        self.worker.ser.target_delta = 8.5
-                    else:
-                        # Llegamos a Reassure. Nos quedamos justito abajo del umbral.
-                        self.worker.ser.target_delta = 8.0
+                    self.worker.ser.target_delta = 8.0
             else:
                 policy = VALID_POLICIES[self.current_policy_index]
                 self.worker.send_policy(policy)
                 self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
 
-            start_time = time.time()
-            while time.time() - start_time < DEMO_STEP_DURATION_SEC:
+            started_at = time.time()
+            while time.time() - started_at < DEMO_STEP_DURATION_SEC:
                 if not self.running:
                     return
                 if self.policy_changed_event.is_set():
                     self.policy_changed_event.clear()
                     break
-                remaining = int(DEMO_STEP_DURATION_SEC - (time.time() - start_time))
+                remaining = int(DEMO_STEP_DURATION_SEC - (time.time() - started_at))
                 self.on_tick_cb(remaining)
                 time.sleep(0.2)
 
             self.current_policy_index = (self.current_policy_index + 1) % len(VALID_POLICIES)
 
 
-
-# =============================================================================
-# FRONTEND - INTERFAZ GRÁFICA TKINTER
-# =============================================================================
-class HapticDemoApp(tk.Tk):
+class HapticDemoApp(ctk.CTk):
     def __init__(self, worker: SerialWorkerThread, is_mock: bool = False):
         super().__init__()
         self.worker = worker
         self.orchestrator: Optional[DemoOrchestrator] = None
-
-        title_suffix = " (MODO SIMULADOR / MOCK)" if is_mock else ""
-        self.title(f"Pulso Háptico - Panel de Control Demo{title_suffix}")
-        self.geometry("720x570")
-        self.configure(bg="#222831")
-
+        suffix = " (MODO SIMULADOR / MOCK)" if is_mock else ""
+        self.title(f"Pulso Háptico - Panel de Control Demo{suffix}")
+        self.geometry("850x780")
+        self.configure(fg_color="#1a1e24")
         self.worker.on_telemetry_received = self.update_telemetry
         self.worker.on_log_message = self.append_log
+        self._build_ui(is_mock)
 
-        self.setup_ui(is_mock)
-
-    def setup_ui(self, is_mock: bool) -> None:
-        style = ttk.Style()
-        style.theme_use("clam")
-        
-        # Banner MOCK
+    def _build_ui(self, is_mock: bool) -> None:
         if is_mock:
-            mock_banner = tk.Label(
-                self, text="⚠️ EJECUTANDO EN MODO MOCK (SIN ARDUINO CONECTADO)",
-                font=("Arial", 10, "bold"), bg="#ff9800", fg="black"
-            )
-            mock_banner.pack(fill="x")
+            ctk.CTkLabel(
+                self,
+                text="MODO MOCK: SIN ARDUINO CONECTADO",
+                text_color="black",
+                fg_color="#ff9800",
+                font=("Roboto", 13, "bold"),
+                corner_radius=8,
+            ).pack(fill="x", padx=20, pady=(15, 0))
 
-        # Título
-        title = tk.Label(
-            self, text="DEMO CONTROL DE POLÍTICAS HÁPTICAS", 
-            font=("Arial", 16, "bold"), bg="#222831", fg="#00ADB5"
-        )
-        title.pack(pady=10)
+        ctk.CTkLabel(
+            self,
+            text="DEMO CONTROL DE POLÍTICAS HÁPTICAS",
+            font=("Roboto", 22, "bold"),
+            text_color="#00ADB5",
+        ).pack(pady=(15, 10))
 
-        # Panel Secuencia
-        auto_frame = tk.Frame(self, bg="#393E46", bd=2, relief="groove")
-        auto_frame.pack(fill="x", padx=15, pady=5)
-
+        auto_frame = ctk.CTkFrame(self, fg_color="#2a3038", corner_radius=12)
+        auto_frame.pack(fill="x", padx=20, pady=5)
         self.auto_var = tk.BooleanVar(value=False)
-        self.auto_check = tk.Checkbutton(
-            auto_frame, text="Modo Secuencia Automática (30s)", variable=self.auto_var,
-            font=("Arial", 11, "bold"), bg="#393E46", fg="#EEEEEE",
-            selectcolor="#222831", activebackground="#393E46", activeforeground="#00ADB5",
-            command=self.toggle_auto_mode
+        ctk.CTkSwitch(
+            auto_frame,
+            text="Modo Secuencia Automática (30s)",
+            variable=self.auto_var,
+            font=("Roboto", 15, "bold"),
+            text_color="#EEEEEE",
+            progress_color="#00ADB5",
+            command=self.toggle_auto_mode,
+        ).pack(side="left", padx=20, pady=15)
+        self.timer_label = ctk.CTkLabel(
+            auto_frame, text="Timer: --s", font=("Roboto", 15, "bold"), text_color="#00ADB5"
         )
-        self.auto_check.pack(side="left", padx=10, pady=10)
+        self.timer_label.pack(side="right", padx=20)
 
-        self.timer_label = tk.Label(
-            auto_frame, text="Timer: --s", font=("Arial", 11, "bold"), bg="#393E46", fg="#00ADB5"
+        button_frame = ctk.CTkFrame(
+            self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        self.timer_label.pack(side="right", padx=10)
+        button_frame.pack(fill="x", padx=20, pady=5)
+        ctk.CTkLabel(
+            button_frame,
+            text="Selección Manual de Política",
+            font=("Roboto", 14, "bold"),
+            text_color="#EEEEEE",
+        ).pack(pady=(10, 5))
+        button_container = ctk.CTkFrame(button_frame, fg_color="transparent")
+        button_container.pack(fill="x", padx=15, pady=5)
 
-        # Botones Manuales
-        btn_frame = tk.LabelFrame(
-            self, text=" Selección Manual de Política ", font=("Arial", 10, "bold"),
-            bg="#222831", fg="#EEEEEE", bd=2, relief="groove"
-        )
-        btn_frame.pack(fill="x", padx=15, pady=10)
-
-        self.buttons: Dict[str, tk.Button] = {}
         colors = {"reassure": "#2e7d32", "awareness": "#f9a825", "breath": "#1565c0", "calm_down": "#c62828"}
-
+        hover_colors = {"reassure": "#1b5e20", "awareness": "#f57f17", "breath": "#0d47a1", "calm_down": "#b71c1c"}
+        self.buttons: Dict[str, ctk.CTkButton] = {}
         for policy in VALID_POLICIES:
-            btn = tk.Button(
-                btn_frame, text=policy.upper(), font=("Arial", 11, "bold"),
-                bg=colors[policy], fg="white", activebackground="#eeeeee",
-                command=lambda p=policy: self.select_policy_manual(p)
+            button = ctk.CTkButton(
+                button_container,
+                text=policy.upper(),
+                font=("Roboto", 14, "bold"),
+                fg_color=colors[policy],
+                hover_color=hover_colors[policy],
+                corner_radius=8,
+                command=lambda selected=policy: self.select_policy_manual(selected),
             )
-            btn.pack(side="left", expand=True, fill="x", padx=5, pady=10)
-            self.buttons[policy] = btn
+            button.pack(side="left", expand=True, fill="x", padx=8)
+            self.buttons[policy] = button
+        ctk.CTkButton(
+            button_container,
+            text="STOP",
+            font=("Roboto", 14, "bold"),
+            fg_color="#333333",
+            hover_color="#111111",
+            text_color="#ff4444",
+            corner_radius=8,
+            width=90,
+            command=self.stop_playback,
+        ).pack(side="right", padx=8)
 
-        stop_btn = tk.Button(
-            btn_frame, text="STOP", font=("Arial", 11, "bold"),
-            bg="#333333", fg="#ff4444", command=self.stop_playback
+        telemetry_frame = ctk.CTkFrame(
+            self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        stop_btn.pack(side="right", padx=5, pady=10)
-
-        # Monitor Telemetría
-        tel_frame = tk.LabelFrame(
-            self, text=" Telemetría en Tiempo Real ", font=("Arial", 10, "bold"),
-            bg="#222831", fg="#EEEEEE", bd=2, relief="groove"
+        telemetry_frame.pack(fill="x", padx=20, pady=5)
+        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 16))
+        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 16))
+        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 16))
+        for column, label in enumerate((self.lbl_bpm, self.lbl_smooth, self.lbl_delta)):
+            label.grid(row=0, column=column, padx=20, pady=10, sticky="ew")
+        self.lbl_active_policy = ctk.CTkLabel(
+            telemetry_frame,
+            text="Política Activa: NINGUNA",
+            font=("Roboto", 16, "bold"),
+            text_color="#00ADB5",
         )
-        tel_frame.pack(fill="x", padx=15, pady=5)
+        self.lbl_active_policy.grid(row=1, column=0, columnspan=3, pady=(0, 10))
+        telemetry_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
-        self.lbl_bpm = tk.Label(tel_frame, text="BPM: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
-        self.lbl_bpm.grid(row=0, column=0, padx=15, pady=5)
-
-        self.lbl_smooth = tk.Label(tel_frame, text="Undefined: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
-        self.lbl_smooth.grid(row=0, column=1, padx=15, pady=5)
-
-        self.lbl_delta = tk.Label(tel_frame, text="Undefined: --", font=("Arial", 12), bg="#222831", fg="#EEEEEE")
-        self.lbl_delta.grid(row=0, column=2, padx=15, pady=5)
-
-        self.lbl_active_policy = tk.Label(tel_frame, text="Política Activa: NINGUNA", font=("Arial", 12, "bold"), bg="#222831", fg="#00ADB5")
-        self.lbl_active_policy.grid(row=1, column=0, columnspan=3, pady=5)
-
-        # Consola Log
-        log_frame = tk.LabelFrame(
-            self, text=" Consola de Comunicaciones ", font=("Arial", 10, "bold"),
-            bg="#222831", fg="#EEEEEE", bd=2, relief="groove"
+        self.image_frame = ctk.CTkFrame(
+            self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        log_frame.pack(fill="both", expand=True, padx=15, pady=10)
+        self.image_frame.pack(fill="both", expand=True, padx=20, pady=(5, 20))
+        self.image_label = ctk.CTkLabel(
+            self.image_frame,
+            text="Selecciona una política para visualizar su estado",
+            font=("Roboto", 16, "italic"),
+            text_color="#888888",
+        )
+        self.image_label.pack(expand=True, pady=10)
+        self.ctk_images = self._load_policy_images()
 
-        self.log_text = tk.Text(log_frame, bg="#111111", fg="#00FF00", font=("Consolas", 9))
-        self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
+    def _load_policy_images(self) -> Dict[str, Optional[ctk.CTkImage]]:
+        names = {
+            "reassure": "Demo para 189 (3).jpg",
+            "awareness": "Demo para 189.jpg",
+            "breath": "Demo para 189 (1).jpg",
+            "calm_down": "Demo para 189 (2).jpg",
+        }
+        images: Dict[str, Optional[ctk.CTkImage]] = {}
+        for policy, name in names.items():
+            try:
+                image = Image.open(Path(__file__).resolve().parent / name)
+                images[policy] = ctk.CTkImage(light_image=image, dark_image=image, size=(450, 300))
+            except (FileNotFoundError, OSError):
+                images[policy] = None
+        return images
+
+    def update_displayed_image(self, policy: str) -> None:
+        image = self.ctk_images.get(policy)
+        self.image_label.configure(image=image, text="" if image else "Imagen no encontrada")
 
     def select_policy_manual(self, policy: str) -> None:
         if self.auto_var.get():
             self.auto_var.set(False)
             self.toggle_auto_mode()
-        
         self.highlight_button(policy)
         self.worker.send_policy(policy)
-        self.lbl_active_policy.config(text=f"Política Activa: {policy.upper()}")
+        self.lbl_active_policy.configure(text=f"Política Activa: {policy.upper()}")
+        self.update_displayed_image(policy)
 
     def highlight_button(self, policy: str) -> None:
-        for p, btn in self.buttons.items():
-            if p == policy:
-                btn.config(relief="sunken", bd=4)
-            else:
-                btn.config(relief="raised", bd=2)
+        for current, button in self.buttons.items():
+            button.configure(border_width=3 if current == policy else 0, border_color="#FFFFFF")
 
     def stop_playback(self) -> None:
         if self.auto_var.get():
             self.auto_var.set(False)
             self.toggle_auto_mode()
         self.worker.stop_motors()
-        self.lbl_active_policy.config(text="Política Activa: DETENIDO")
+        self.lbl_active_policy.configure(text="Política Activa: DETENIDO")
         self.highlight_button("")
+        self.image_label.configure(image=None, text="Detenido - Sin política activa")
 
     def toggle_auto_mode(self) -> None:
         if self.auto_var.get():
-            self.orchestrator = DemoOrchestrator(
-                self.worker, 
-                on_change_cb=self.on_auto_policy_change,
-                on_tick_cb=self.on_auto_tick
-            )
+            self.orchestrator = DemoOrchestrator(self.worker, self.on_auto_policy_change, self.on_auto_tick)
             self.orchestrator.start_demo()
-        else:
-            if self.orchestrator:
-                self.orchestrator.stop_demo()
-                self.orchestrator = None
-            self.timer_label.config(text="Timer: --s")
+        elif self.orchestrator:
+            self.orchestrator.stop_demo()
+            self.orchestrator = None
+            self.timer_label.configure(text="Timer: --s")
 
     def on_auto_policy_change(self, policy: str, duration: int) -> None:
         self.after(0, lambda: self._update_auto_ui(policy))
 
     def _update_auto_ui(self, policy: str) -> None:
         self.highlight_button(policy)
-        self.lbl_active_policy.config(text=f"Política Activa (AUTO): {policy.upper()}")
+        self.lbl_active_policy.configure(text=f"Política Activa (AUTO): {policy.upper()}")
+        self.update_displayed_image(policy)
 
     def on_auto_tick(self, remaining: int) -> None:
-        self.after(0, lambda: self.timer_label.config(text=f"Timer: {remaining}s"))
+        self.after(0, lambda: self.timer_label.configure(text=f"Timer: {remaining}s"))
 
     def update_telemetry(self, data: Dict[str, str]) -> None:
-        def _update():
-            # Solo mostrar datos si la señal es válida (baseline_samples > 0)
-            signal_ok = data.get("signal_ok")
-            if signal_ok == "1":
-                self.lbl_bpm.config(text=f"BPM: {data.get('bpm', '--')}")
-                if(data.get("phase") == "run"):
-                    self.lbl_smooth.config(text=f"Baseline: {data.get('baseline_bpm', '--')}")
-                    self.lbl_delta.config(text=f"Delta: {data.get('delta', '--')}")
-                else:
-                    self.lbl_smooth.config(text=f"Beat average: {data.get('beat_avg', '--')}")
-                    self.lbl_delta.config(text=f"Samples: {data.get('baseline_samples', '--')}")
-                
-                # Check if we should automatically transition the policy based on mock telemetry
-                if self.auto_var.get() and hasattr(self.worker.ser, "target_delta"):
-                    suggested_policy = data.get("policy")
-                    current_active = self.lbl_active_policy.cget("text")
-                    current_policy = current_active.split(": ")[-1].lower() if ": " in current_active else ""
-                    
-                    if suggested_policy and suggested_policy in VALID_POLICIES and suggested_policy != current_policy:
-                        self.worker.send_policy(suggested_policy)
-                        self._update_auto_ui(suggested_policy)
-                        if self.orchestrator:
-                            self.orchestrator.policy_changed_event.set()
+        def update() -> None:
+            if data.get("signal_ok") != "1":
+                return
+            self.lbl_bpm.configure(text=f"BPM: {data.get('bpm', '--')}")
+            if data.get("phase") == "run":
+                self.lbl_smooth.configure(text=f"Baseline: {data.get('baseline_bpm', '--')}")
+                self.lbl_delta.configure(text=f"Delta: {data.get('delta', '--')}")
+            else:
+                self.lbl_smooth.configure(text=f"Beat average: {data.get('beat_avg', '--')}")
+                self.lbl_delta.configure(text=f"Samples: {data.get('baseline_samples', '--')}")
 
-        self.after(0, _update)
+            if self.auto_var.get() and hasattr(self.worker.ser, "target_delta"):
+                suggested = data.get("policy")
+                current = self.lbl_active_policy.cget("text").split(": ")[-1].lower()
+                if suggested in VALID_POLICIES and suggested != current:
+                    self.worker.send_policy(suggested)
+                    self._update_auto_ui(suggested)
+                    if self.orchestrator:
+                        self.orchestrator.policy_changed_event.set()
+
+        self.after(0, update)
 
     def append_log(self, text: str) -> None:
-        def _append():
-            self.log_text.insert(tk.END, text + "\n")
-            self.log_text.see(tk.END)
-        self.after(0, _append)
-
-
+        print(text)
