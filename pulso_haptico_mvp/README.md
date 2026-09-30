@@ -91,3 +91,7 @@ ERR,...
 ## Nota de diseño
 
 El JSON se conserva como formato expresivo de catálogo en la PC. El Nano sólo recibe una versión compacta porque tiene poca RAM y no conviene cargar un parser JSON en esta etapa.
+
+## COLORES
+Al arduino (del borde al centro) --> R A Ne Na V A B
+Al coso violeta --> 
