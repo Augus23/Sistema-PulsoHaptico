@@ -7,7 +7,7 @@ import customtkinter as ctk
 import tkinter as tk
 from PIL import Image
 
-from demo.config import DEMO_STEP_DURATION_SEC, VALID_POLICIES
+from demo.config import DEMO_STEP_DURATION_SEC, SEQUENTIAL_POLICIES, VALID_POLICIES
 from demo.hardware import SerialWorkerThread
 
 
@@ -64,7 +64,7 @@ class DemoOrchestrator(threading.Thread):
                 else:
                     self.worker.ser.target_delta = 8.0
             else:
-                policy = VALID_POLICIES[self.current_policy_index]
+                policy = SEQUENTIAL_POLICIES[self.current_policy_index]
                 self.worker.send_policy(policy)
                 self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
 
@@ -79,7 +79,7 @@ class DemoOrchestrator(threading.Thread):
                 self.on_tick_cb(remaining)
                 time.sleep(0.2)
 
-            self.current_policy_index = (self.current_policy_index + 1) % len(VALID_POLICIES)
+            self.current_policy_index = (self.current_policy_index + 1) % len(SEQUENTIAL_POLICIES)
 
 
 class HapticDemoApp(ctk.CTk):
@@ -203,8 +203,8 @@ class HapticDemoApp(ctk.CTk):
 
     def _load_policy_images(self) -> Dict[str, Optional[ctk.CTkImage]]:
         names = {
-            "reassure": "Demo para 189 (3).jpg",
-            "awareness": "Demo para 189.jpg",
+            "reassure": "Demo para 189.jpg",
+            "awareness": "Demo para 189 (3).jpg",
             "breath": "Demo para 189 (1).jpg",
             "calm_down": "Demo para 189 (2).jpg",
         }

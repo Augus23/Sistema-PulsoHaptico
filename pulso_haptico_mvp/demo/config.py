@@ -32,5 +32,7 @@ TRANSITION_TO_CODE = {
     "pause": 4,
 }
 
-VALID_POLICIES = ["awareness", "reassure", "breath", "calm_down"]
+# The automatic demo intentionally starts with awareness and then reassure.
+SEQUENTIAL_POLICIES = ["awareness", "reassure", "breath", "calm_down"]
+VALID_POLICIES = SEQUENTIAL_POLICIES.copy()
 DEMO_STEP_DURATION_SEC = 15.0
