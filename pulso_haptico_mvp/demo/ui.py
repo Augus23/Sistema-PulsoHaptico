@@ -39,45 +39,45 @@ class DemoOrchestrator(threading.Thread):
             current_active = self.worker.ser.target_delta if hasattr(self.worker.ser, "target_delta") else 0
             
             is_mock = hasattr(self.worker.ser, "target_delta")
-            # if is_mock
-            current_d = getattr(self.worker.ser, "current_delta", 0.0)
-            
-            # Máquina de estados para subir y bajar lentamente
-            if current_d >= 33.5:
-                direction = -1
-            elif current_d <= 8.5:
-                direction = 1
+            if is_mock:
+                current_d = getattr(self.worker.ser, "current_delta", 0.0)
+                
+                # Máquina de estados para subir y bajar lentamente
+                if current_d >= 33.5:
+                    direction = -1
+                elif current_d <= 8.5:
+                    direction = 1
 
-            if direction == 1:
-                if current_d < 9.0:
-                    if current_d < 2.0:
-                        # Arrancando desde cero (fresh start). Toma 15s llegar a 9.0.
-                        self.worker.ser.target_delta = 9.0
-                    else:
-                        # Rebote desde el fondo (estaba estacionado en 8.0). Sube rápido a Awareness.
+                if direction == 1:
+                    if current_d < 9.0:
+                        if current_d < 2.0:
+                            # Arrancando desde cero (fresh start). Toma 15s llegar a 9.0.
+                            self.worker.ser.target_delta = 9.0
+                        else:
+                            # Rebote desde el fondo (estaba estacionado en 8.0). Sube rápido a Awareness.
+                            self.worker.ser.target_delta = 19.0
+                    elif current_d < 19.0:
                         self.worker.ser.target_delta = 19.0
-                elif current_d < 19.0:
-                    self.worker.ser.target_delta = 19.0
-                elif current_d < 33.0:
-                    self.worker.ser.target_delta = 33.0
+                    elif current_d < 33.0:
+                        self.worker.ser.target_delta = 33.0
+                    else:
+                        # Llegamos a Calm Down. Nos quedamos justito arriba del umbral.
+                        self.worker.ser.target_delta = 34.0
                 else:
-                    # Llegamos a Calm Down. Nos quedamos justito arriba del umbral.
-                    self.worker.ser.target_delta = 34.0
+                    if current_d > 33.0:
+                        # Arrancando desde Calm Down hacia abajo.
+                        self.worker.ser.target_delta = 18.5
+                    elif current_d > 19.0:
+                        self.worker.ser.target_delta = 18.5
+                    elif current_d > 9.0:
+                        self.worker.ser.target_delta = 8.5
+                    else:
+                        # Llegamos a Reassure. Nos quedamos justito abajo del umbral.
+                        self.worker.ser.target_delta = 8.0
             else:
-                if current_d > 33.0:
-                    # Arrancando desde Calm Down hacia abajo.
-                    self.worker.ser.target_delta = 18.5
-                elif current_d > 19.0:
-                    self.worker.ser.target_delta = 18.5
-                elif current_d > 9.0:
-                    self.worker.ser.target_delta = 8.5
-                else:
-                    # Llegamos a Reassure. Nos quedamos justito abajo del umbral.
-                    self.worker.ser.target_delta = 8.0
-            # else:
-            #     policy = VALID_POLICIES[self.current_policy_index]
-            #     self.worker.send_policy(policy)
-            #     self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
+                policy = VALID_POLICIES[self.current_policy_index]
+                self.worker.send_policy(policy)
+                self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
 
             start_time = time.time()
             while time.time() - start_time < DEMO_STEP_DURATION_SEC:
