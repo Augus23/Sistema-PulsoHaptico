@@ -1,13 +1,23 @@
 from typing import Optional, Any, Dict, List, Callable
-from serial import Serial
 import threading
-import math
 import time
-import serial.tools.list_ports as list_ports
+
+try:
+    from serial import Serial
+    import serial.tools.list_ports as list_ports
+except ImportError:  # pragma: no cover - solo para mock/demo sin hardware
+    Serial = Any  # type: ignore[misc]
+    list_ports = None
+
+from demo.config import POLICY_TO_CODE, SEQUENTIAL_SIMULATION
 from demo.protocol import parse_telemetry_line, build_effective_pattern
+
+MOCK_BASELINE_BPM = 68
 
 
 def choose_port_interactively() -> Optional[str]:
+    if list_ports is None:
+        return None
     ports = list(list_ports.comports())
     if not ports:
         return None
@@ -50,24 +60,57 @@ def display_received_telemetry(telemetry: Dict[str, str]) -> None:
 # =============================================================================
 class MockArduinoSerial:
     """
-    Simula una interfaz de objeto pySerial en memoria para probar
-    el programa sin necesidad de conectar hardware real.
+    Simula una interfaz serial con el mismo protocolo de telemetría y ACK/EVT
+    que usa el Arduino real, de forma que la UI pueda probarse sin hardware.
     """
+
+    BASELINE_BPM = MOCK_BASELINE_BPM
+    POLICY_TO_DELTA = {
+        policy: float(simulation["bpm"]) - MOCK_BASELINE_BPM
+        for policy, simulation in SEQUENTIAL_SIMULATION.items()
+    }
+    POLICY_TO_LEVEL = {
+        "awareness": "activacion_leve",
+        "reassure": "regulacion_estable",
+        "breath": "activacion_moderada",
+        "calm_down": "activacion_alta",
+    }
+
     def __init__(self):
         self.read_buffer: List[str] = [
             "EVT,boot,device=stress_detector_amped_haptic_mvp_MOCK\n",
-            "EVT,info,pulse_sensor=SIMULATOR,motors=6_PWM\n"
+            "EVT,info,pulse_sensor=SIMULATOR,motors=6_PWM\n",
         ]
         self.lock = threading.Lock()
         self.running = True
-        self.baseline_bpm = 70
+        self.baseline_bpm = self.BASELINE_BPM
         self.current_delta = 0.0
         self._target_delta = 0.0
         self.delta_step_value = 0.5
-        
-        # Hilo de generación de telemetría falsa
+        self.signal_ok = False
+        self.current_policy: Optional[str] = None
+        self.baseline_count = 0
+        self.playback_active = 0
+        self._queue_boot_telemetry()
         self.telemetry_thread = threading.Thread(target=self._generate_telemetry, daemon=True)
         self.telemetry_thread.start()
+
+    def _queue_boot_telemetry(self) -> None:
+        self.read_buffer.append(
+            "TEL,phase=baseline,raw=512,smooth_signal=510.0,amp=0,signal_ok=0,"
+            "bpm=0,beat_avg=0,baseline_samples=0,waiting_for_valid_signal=1,policy=none,policy_code=0\n"
+        )
+
+    def set_policy(self, policy: str) -> None:
+        if policy not in self.POLICY_TO_DELTA:
+            raise ValueError(f"Política no soportada por mock: {policy}")
+        with self.lock:
+            self.current_policy = policy
+            self.signal_ok = True
+            self.target_delta = self.POLICY_TO_DELTA[policy]
+            self.read_buffer.append(
+                f"EVT,policy_change,level={policy},policy={policy},policy_code={POLICY_TO_CODE[policy]}\n"
+            )
 
     @property
     def target_delta(self) -> float:
@@ -76,54 +119,63 @@ class MockArduinoSerial:
     @target_delta.setter
     def target_delta(self, value: float) -> None:
         self._target_delta = value
-        # Calculamos el paso lineal para que llegue al objetivo un poco antes (13.5s)
-        # Esto compensa los delays del time.sleep y asegura que cruce el umbral a tiempo
         self.delta_step_value = abs(self._target_delta - self.current_delta) / 13.5
         if self.delta_step_value < 0.5:
             self.delta_step_value = 0.5
 
     def _generate_telemetry(self):
-        t = 0
         while self.running:
-            time.sleep(1.0)
-            t += 1
-            
+            time.sleep(0.6)
+
             with self.lock:
-                if self.current_delta < self._target_delta:
-                    self.current_delta = min(self._target_delta, self.current_delta + self.delta_step_value)
-                elif self.current_delta > self._target_delta:
-                    self.current_delta = max(self._target_delta, self.current_delta - self.delta_step_value)
-                delta = int(self.current_delta)
+                policy = self.current_policy
+                if policy is None:
+                    self.current_delta = 0.0
+                    self.signal_ok = False
+                    delta = 0
+                    phase = "baseline"
+                    baseline_samples = 0
+                else:
+                    if self.current_delta < self._target_delta:
+                        self.current_delta = min(self._target_delta, self.current_delta + self.delta_step_value)
+                    elif self.current_delta > self._target_delta:
+                        self.current_delta = max(self._target_delta, self.current_delta - self.delta_step_value)
+                    self.signal_ok = True
+                    delta = int(round(self.current_delta))
+                    if self.baseline_count < 8:
+                        self.baseline_count += 1
+                        phase = "baseline"
+                    else:
+                        phase = "run"
+                    baseline_samples = self.baseline_count
+                playback = self.playback_active
 
-            smooth_bpm = self.baseline_bpm + delta
-            # Oscilación simulada leve de BPM
-            simulated_bpm = smooth_bpm + int(3 * math.sin(t))
-
-            # Clasificación de acuerdo a reglas del sketch de Arduino
-            if delta >= 33:
-                pol = "calm_down"
-                pol_code = 4
-                lvl = "activacion_alta"
-            elif delta >= 19:
-                pol = "breath"
-                pol_code = 3
-                lvl = "activacion_moderada"
-            elif delta >= 9:
-                pol = "awareness"
-                pol_code = 2
-                lvl = "activacion_leve"
+            if policy is None:
+                line = (
+                    "TEL,phase=baseline,raw=512,smooth_signal=510.0,amp=0,signal_ok=0,"
+                    "bpm=0,beat_avg=0,baseline_samples=0,elapsed_s=0,waiting_for_valid_signal=1,"
+                    f"level=sin_pulso,policy=none,policy_code=0,playback={playback}\n"
+                )
             else:
-                pol = "reassure"
-                pol_code = 1
-                lvl = "regulacion_estable"
+                bpm = self.baseline_bpm + delta
+                amplitude = int(SEQUENTIAL_SIMULATION[policy]["amplitude"])
+                policy_code = POLICY_TO_CODE[policy]
+                level = self.POLICY_TO_LEVEL[policy]
+                if phase == "baseline":
+                    line = (
+                        f"TEL,phase=baseline,raw=512,smooth_signal=510.0,amp={amplitude},signal_ok=1,"
+                        f"bpm={bpm},beat_avg={bpm},baseline_samples={baseline_samples},"
+                        f"elapsed_s={baseline_samples},waiting_for_valid_signal=0,policy={policy},"
+                        f"policy_code={policy_code}\n"
+                    )
+                else:
+                    line = (
+                        f"TEL,phase=run,raw=512,smooth_signal=510.0,amp={amplitude},signal_ok=1,"
+                        f"bpm={bpm},beat_avg={bpm},smooth_bpm={bpm},baseline_bpm={self.baseline_bpm},"
+                        f"delta={delta},level={level},policy={policy},policy_code={policy_code},"
+                        f"playback={playback}\n"
+                    )
 
-            line = (
-                f"TEL,phase=run,raw=512,smooth_signal=510.0,amp=150,signal_ok=1,"
-                f"bpm={simulated_bpm}.0,beat_avg={simulated_bpm},smooth_bpm={smooth_bpm},"
-                f"baseline_bpm={self.baseline_bpm},delta={delta},"
-                f"level={lvl},policy={pol},policy_code={pol_code},playback=0\n"
-            )
-            
             with self.lock:
                 self.read_buffer.append(line)
 
@@ -137,21 +189,29 @@ class MockArduinoSerial:
 
     def write(self, data: bytes) -> int:
         cmd = data.decode("ascii", errors="ignore").strip()
-        
-        # Respuestas simuladas del protocolo
+
         with self.lock:
             if cmd == "PING":
                 self.read_buffer.append("ACK,PONG\n")
             elif cmd == "STOP":
                 self.read_buffer.append("ACK,STOPPED\n")
+                self.playback_active = 0
+                self.current_policy = None
+                self.signal_ok = False
+                self.current_delta = 0.0
+                self.target_delta = 0.0
+                self.baseline_count = 0
             elif cmd.startswith("PATTERN,"):
                 parts = cmd.split(",")
-                self.read_buffer.append(f"ACK,PATTERN_HEADER,policy_code={parts[1]},custom={parts[2]},steps={parts[5]}\n")
+                self.read_buffer.append(
+                    f"ACK,PATTERN_HEADER,policy_code={parts[1]},custom={parts[2]},steps={parts[5]}\n"
+                )
             elif cmd.startswith("STEP,"):
                 self.read_buffer.append("ACK,STEP,OK\n")
             elif cmd == "END":
                 self.read_buffer.append("ACK,PATTERN_LOADED,status=OK\n")
                 self.read_buffer.append("EVT,playback_started\n")
+                self.playback_active = 1
 
         return len(data)
 
@@ -209,6 +269,8 @@ class SerialWorkerThread(threading.Thread):
             self.log(f"[ERROR] Política '{policy}' no encontrada en catálogo.")
             return
 
+        if hasattr(self.ser, "set_policy"):
+            self.ser.set_policy(policy)
         effective = build_effective_pattern(self.catalog[policy])
         self.log(f"[TX] Enviando Política: {effective.policy.upper()} ({effective.pattern_id})")
 

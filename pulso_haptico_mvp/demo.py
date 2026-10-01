@@ -40,9 +40,9 @@ from demo.ui import HapticDemoApp
 try:
     import serial
     from serial.tools import list_ports
-except ImportError:
-    print("ERROR: falta instalar pyserial. Ejecutá: pip install pyserial", file=sys.stderr)
-    sys.exit(1)
+except ImportError:  # pragma: no cover - el mock no necesita serial
+    serial = None
+    list_ports = None
 
 
 def main() -> int:
@@ -65,6 +65,9 @@ def main() -> int:
         print("[MOCK] Inicializando simulador de hardware...")
         ser_instance = MockArduinoSerial()
     else:
+        if serial is None:
+            print("ERROR: falta instalar pyserial para trabajar con hardware real. Ejecutá: pip install pyserial", file=sys.stderr)
+            return 1
         port = args.port or choose_port_interactively()
         if not port:
             print("[ERROR] No se seleccionó puerto. Si no tienes hardware, ejecuta con --mock")
