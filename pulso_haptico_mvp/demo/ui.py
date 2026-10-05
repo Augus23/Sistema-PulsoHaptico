@@ -38,37 +38,75 @@ class DemoOrchestrator(threading.Thread):
         self.running = False
         self.current_policy_index = 0
         self.policy_changed_event = threading.Event()
+        self.fake_delta = 0.0
+        self.target_delta = 9.0
+        self.delta_step_value = 0.0
 
     def start_demo(self) -> None:
         if not self.running:
             self.running = True
+            super().__init__(daemon=True)
             self.start()
 
     def stop_demo(self) -> None:
         self.running = False
+        self.policy_changed_event.set()
 
     def run(self) -> None:
+        direction = 1  # 1 = subiendo, -1 = bajando
+        self.fake_delta = 0.0
+        
         while self.running:
-            policy = SEQUENTIAL_POLICIES[self.current_policy_index]
-            if hasattr(self.worker.ser, "target_delta"):
-                target_deltas = {"awareness": 12.0, "reassure": 4.0, "breath": 25.0, "calm_down": 38.0}
-                self.worker.ser.target_delta = target_deltas[policy]
-            else:
-                self.worker.send_policy(policy)
-            self.on_change_cb(policy, int(DEMO_STEP_DURATION_SEC))
+            current_d = self.fake_delta
+            
+            # Máquina de estados para subir y bajar lentamente
+            if current_d >= 33.09:
+                direction = -1
+            elif current_d <= 8.91:
+                direction = 1
 
-            started_at = time.time()
-            while time.time() - started_at < DEMO_STEP_DURATION_SEC:
+            if direction == 1:
+                if current_d < 5.0:
+                    self.target_delta = 9.05
+                elif current_d < 14.0:
+                    self.target_delta = 19.05
+                elif current_d < 26.0:
+                    self.target_delta = 33.05
+                else:
+                    self.target_delta = 33.1
+            else:
+                if current_d > 26.0:
+                    self.target_delta = 18.95
+                elif current_d > 14.0:
+                    self.target_delta = 8.95
+                else:
+                    self.target_delta = 8.9
+
+            transition_time = max(1.0, float(DEMO_STEP_DURATION_SEC))
+            self.delta_step_value = abs(self.target_delta - self.fake_delta) / transition_time
+
+
+            start_time = time.time()
+            last_tick = start_time
+            while time.time() - start_time < DEMO_STEP_DURATION_SEC:
                 if not self.running:
                     return
                 if self.policy_changed_event.is_set():
                     self.policy_changed_event.clear()
                     break
-                remaining = int(DEMO_STEP_DURATION_SEC - (time.time() - started_at))
-                self.on_tick_cb(remaining)
-                time.sleep(0.2)
+                
+                now = time.time()
+                dt = now - last_tick
+                last_tick = now
+                
+                if self.fake_delta < self.target_delta:
+                    self.fake_delta = min(self.target_delta, self.fake_delta + self.delta_step_value * dt)
+                elif self.fake_delta > self.target_delta:
+                    self.fake_delta = max(self.target_delta, self.fake_delta - self.delta_step_value * dt)
 
-            self.current_policy_index = (self.current_policy_index + 1) % len(SEQUENTIAL_POLICIES)
+                remaining = int(math.ceil(DEMO_STEP_DURATION_SEC - (now - start_time)))
+                self.on_tick_cb(remaining)
+                time.sleep(0.1)
 
 
 class HapticDemoApp(ctk.CTk):
@@ -148,7 +186,7 @@ class HapticDemoApp(ctk.CTk):
         self.auto_var = tk.BooleanVar(value=False)
         ctk.CTkSwitch(
             auto_frame,
-            text="Modo Secuencia Automática (30s)",
+            text=f"Modo Secuencia Automática ({DEMO_STEP_DURATION_SEC})",
             variable=self.auto_var,
             font=("Roboto", 15, "bold"),
             text_color="#EEEEEE",
@@ -446,9 +484,6 @@ class HapticDemoApp(ctk.CTk):
             self.ecg_amplitude = self.ecg_transition_from_amplitude + (
                 self.ecg_target_amplitude - self.ecg_transition_from_amplitude
             ) * progress
-            self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
-            self.lbl_smooth.configure(text="Simulado")
-            self.lbl_delta.configure(text=f"Nivel: {round(self.ecg_amplitude)}")
 
         if not self.ecg_signal_ok or (self.is_mock and self.ecg_policy is None):
             waiting_text = (
@@ -535,9 +570,22 @@ class HapticDemoApp(ctk.CTk):
 
     def update_telemetry(self, data: Dict[str, str]) -> None:
         def update() -> None:
-            if self.sequential_simulation:
-                return
-            if self.is_mock and self.ecg_policy is None:
+            # OVERRIDE con delta falso si estamos en Modo Automático y es phase=run
+            if self.auto_var.get() and self.orchestrator and data.get("phase") == "run":
+                fake_d = self.orchestrator.fake_delta
+                data['delta'] = str(int(fake_d))
+                
+                if fake_d >= 33: suggested = "calm_down"
+                elif fake_d >= 19: suggested = "breath"
+                elif fake_d >= 9: suggested = "reassure"
+                else: suggested = "awareness"
+                data['policy'] = suggested
+                
+                baseline_str = data.get('baseline_bpm', '0')
+                if baseline_str.isdigit():
+                    data['bpm'] = str(int(baseline_str) + int(fake_d))
+
+            if self.is_mock and self.ecg_policy is None and not self.auto_var.get():
                 self.ecg_signal_ok = False
                 self.ecg_bpm = 0.0
                 self.ecg_amplitude = 0.0
@@ -575,13 +623,14 @@ class HapticDemoApp(ctk.CTk):
                 self.lbl_smooth.configure(text=f"Beat average: {data.get('beat_avg', '--')}")
                 self.lbl_delta.configure(text=f"Samples: {data.get('baseline_samples', '--')}")
 
-            if self.auto_var.get() and hasattr(self.worker.ser, "target_delta"):
+            if self.auto_var.get():
                 suggested = data.get("policy")
                 current = self.lbl_active_policy.cget("text").split(": ")[-1].lower()
                 if suggested in VALID_POLICIES and suggested != current:
+                    is_initial_sync = current not in VALID_POLICIES
                     self.worker.send_policy(suggested)
                     self._update_auto_ui(suggested)
-                    if self.orchestrator:
+                    if self.orchestrator and not is_initial_sync:
                         self.orchestrator.policy_changed_event.set()
 
         self.after(0, update)

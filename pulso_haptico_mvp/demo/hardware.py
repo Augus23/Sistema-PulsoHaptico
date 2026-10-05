@@ -59,39 +59,20 @@ def display_received_telemetry(telemetry: Dict[str, str]) -> None:
 # SIMULADOR DE ARDUINO (MOCK SERIAL)
 # =============================================================================
 class MockArduinoSerial:
-    """
-    Simula una interfaz serial con el mismo protocolo de telemetría y ACK/EVT
-    que usa el Arduino real, de forma que la UI pueda probarse sin hardware.
-    """
-
-    BASELINE_BPM = MOCK_BASELINE_BPM
-    POLICY_TO_DELTA = {
-        policy: float(simulation["bpm"]) - MOCK_BASELINE_BPM
-        for policy, simulation in SEQUENTIAL_SIMULATION.items()
-    }
-    POLICY_TO_LEVEL = {
-        "awareness": "activacion_leve",
-        "reassure": "regulacion_estable",
-        "breath": "activacion_moderada",
-        "calm_down": "activacion_alta",
-    }
+    POLICY_TO_DELTA = {"awareness": 12.0, "reassure": 4.0, "breath": 25.0, "calm_down": 38.0}
 
     def __init__(self):
         self.read_buffer: List[str] = [
             "EVT,boot,device=stress_detector_amped_haptic_mvp_MOCK\n",
-            "EVT,info,pulse_sensor=SIMULATOR,motors=6_PWM\n",
+            "EVT,info,pulse_sensor=SIMULATOR,motors=6_PWM\n"
         ]
         self.lock = threading.Lock()
         self.running = True
-        self.baseline_bpm = self.BASELINE_BPM
-        self.current_delta = 0.0
-        self._target_delta = 0.0
-        self.delta_step_value = 0.5
-        self.signal_ok = False
-        self.current_policy: Optional[str] = None
+        self.baseline_bpm = 70
         self.baseline_count = 0
         self.playback_active = 0
-        self._queue_boot_telemetry()
+        self.signal_ok = False
+        
         self.telemetry_thread = threading.Thread(target=self._generate_telemetry, daemon=True)
         self.telemetry_thread.start()
 
@@ -101,81 +82,15 @@ class MockArduinoSerial:
             "bpm=0,beat_avg=0,baseline_samples=0,waiting_for_valid_signal=1,policy=none,policy_code=0\n"
         )
 
-    def set_policy(self, policy: str) -> None:
-        if policy not in self.POLICY_TO_DELTA:
-            raise ValueError(f"Política no soportada por mock: {policy}")
-        with self.lock:
-            self.current_policy = policy
-            self.signal_ok = True
-            self.target_delta = self.POLICY_TO_DELTA[policy]
-            self.read_buffer.append(
-                f"EVT,policy_change,level={policy},policy={policy},policy_code={POLICY_TO_CODE[policy]}\n"
-            )
-
-    @property
-    def target_delta(self) -> float:
-        return self._target_delta
-
-    @target_delta.setter
-    def target_delta(self, value: float) -> None:
-        self._target_delta = value
-        self.delta_step_value = abs(self._target_delta - self.current_delta) / 13.5
-        if self.delta_step_value < 0.5:
-            self.delta_step_value = 0.5
-
     def _generate_telemetry(self):
         while self.running:
-            time.sleep(0.6)
-
-            with self.lock:
-                policy = self.current_policy
-                if policy is None:
-                    self.current_delta = 0.0
-                    self.signal_ok = False
-                    delta = 0
-                    phase = "baseline"
-                    baseline_samples = 0
-                else:
-                    if self.current_delta < self._target_delta:
-                        self.current_delta = min(self._target_delta, self.current_delta + self.delta_step_value)
-                    elif self.current_delta > self._target_delta:
-                        self.current_delta = max(self._target_delta, self.current_delta - self.delta_step_value)
-                    self.signal_ok = True
-                    delta = int(round(self.current_delta))
-                    if self.baseline_count < 8:
-                        self.baseline_count += 1
-                        phase = "baseline"
-                    else:
-                        phase = "run"
-                    baseline_samples = self.baseline_count
-                playback = self.playback_active
-
-            if policy is None:
-                line = (
-                    "TEL,phase=baseline,raw=512,smooth_signal=510.0,amp=0,signal_ok=0,"
-                    "bpm=0,beat_avg=0,baseline_samples=0,elapsed_s=0,waiting_for_valid_signal=1,"
-                    f"level=sin_pulso,policy=none,policy_code=0,playback={playback}\n"
-                )
-            else:
-                bpm = self.baseline_bpm + delta
-                amplitude = int(SEQUENTIAL_SIMULATION[policy]["amplitude"])
-                policy_code = POLICY_TO_CODE[policy]
-                level = self.POLICY_TO_LEVEL[policy]
-                if phase == "baseline":
-                    line = (
-                        f"TEL,phase=baseline,raw=512,smooth_signal=510.0,amp={amplitude},signal_ok=1,"
-                        f"bpm={bpm},beat_avg={bpm},baseline_samples={baseline_samples},"
-                        f"elapsed_s={baseline_samples},waiting_for_valid_signal=0,policy={policy},"
-                        f"policy_code={policy_code}\n"
-                    )
-                else:
-                    line = (
-                        f"TEL,phase=run,raw=512,smooth_signal=510.0,amp={amplitude},signal_ok=1,"
-                        f"bpm={bpm},beat_avg={bpm},smooth_bpm={bpm},baseline_bpm={self.baseline_bpm},"
-                        f"delta={delta},level={level},policy={policy},policy_code={policy_code},"
-                        f"playback={playback}\n"
-                    )
-
+            time.sleep(1.0)
+            line = (
+                f"TEL,phase=run,raw=512,smooth_signal=510.0,amp=150,signal_ok=1,"
+                f"bpm={self.baseline_bpm}.0,beat_avg={self.baseline_bpm},smooth_bpm={self.baseline_bpm},"
+                f"baseline_bpm={self.baseline_bpm},delta=0,"
+                f"level=activacion_leve,policy=awareness,policy_code=2,playback={self.playback_active}\n"
+            )
             with self.lock:
                 self.read_buffer.append(line)
 

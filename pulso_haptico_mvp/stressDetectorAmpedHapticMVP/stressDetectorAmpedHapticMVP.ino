@@ -655,14 +655,14 @@ StressLevel classifyStressLevel()
   }
   else if (delta >= 9)
   {
-    return LEVEL_AWARENESS;
+    return LEVEL_REASSURE;
   }
   else
   {
     // Incluye baseline - 5 a baseline + 8,
     // y también valores más bajos que la línea base.
     // Para el proyecto, eso no requiere intervención fuerte.
-    return LEVEL_REASSURE;
+    return LEVEL_AWARENESS;
   }
 }
 
@@ -711,10 +711,10 @@ const char* levelName(StressLevel level)
 {
   switch (level)
   {
-    case LEVEL_REASSURE:
+    case LEVEL_AWARENESS:
       return "regulacion_estable";
 
-    case LEVEL_AWARENESS:
+    case LEVEL_REASSURE:
       return "activacion_leve";
 
     case LEVEL_BREATH:
