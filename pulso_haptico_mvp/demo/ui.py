@@ -24,6 +24,9 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 
+# =============================================================================
+# ORQUESTADOR MODO AUTOMÁTICO (LÓGICA CORE)
+# =============================================================================
 class DemoOrchestrator(threading.Thread):
     def __init__(
         self,
@@ -85,7 +88,6 @@ class DemoOrchestrator(threading.Thread):
             transition_time = max(1.0, float(DEMO_STEP_DURATION_SEC))
             self.delta_step_value = abs(self.target_delta - self.fake_delta) / transition_time
 
-
             start_time = time.time()
             last_tick = start_time
             while time.time() - start_time < DEMO_STEP_DURATION_SEC:
@@ -109,7 +111,14 @@ class DemoOrchestrator(threading.Thread):
                 time.sleep(0.1)
 
 
-class HapticDemoApp(ctk.CTk):
+# =============================================================================
+# MÓDULO DE INTERFAZ GRÁFICA (VISTA)
+# =============================================================================
+class HapticUIView:
+    """
+    Clase responsable exclusivamente de la inicialización, manipulación visual,
+    imágenes, animaciones de canvas y actualización gráfica (CustomTkinter).
+    """
     MOCK_ECG_POLICY_LEVELS = {
         "awareness": (8.0, "AWARENESS - NIVEL 1"),
         "reassure": (14.0, "REASSURE - NIVEL 2"),
@@ -138,30 +147,6 @@ class HapticDemoApp(ctk.CTk):
             "La secuencia acompaña la autorregulacion, respetando lo que le resulte comodo a la persona.",
         ),
     }
-
-    def __init__(self, worker: SerialWorkerThread, is_mock: bool = False):
-        super().__init__()
-        self.worker = worker
-        self.is_mock = is_mock
-        self.orchestrator: Optional[DemoOrchestrator] = None
-        suffix = " (MODO SIMULADOR / MOCK)" if is_mock else ""
-        self.title(f"Pulso Háptico - Panel de Control Demo{suffix}")
-        self.geometry("850x780")
-        self.configure(fg_color="#1a1e24")
-        self.worker.on_telemetry_received = self.update_telemetry
-        self.worker.on_log_message = self.append_log
-        self.ecg_bpm = 70.0
-        self.ecg_amplitude = 0.0
-        self.ecg_policy: Optional[str] = None
-        self.ecg_target_bpm = 70.0
-        self.ecg_target_amplitude = 0.0
-        self.ecg_transition_started_at = time.monotonic()
-        self.ecg_transition_from_bpm = 70.0
-        self.ecg_transition_from_amplitude = 0.0
-        self.ecg_signal_ok = False
-        self.sequential_simulation = False
-        self._build_ui(is_mock)
-        self._animate_ecg()
 
     def _build_ui(self, is_mock: bool) -> None:
         if is_mock:
@@ -397,77 +382,9 @@ class HapticDemoApp(ctk.CTk):
         self.scenario_support_label.configure(text="ACOMPANAMIENTO HAPTICO")
         self.scenario_response_label.configure(text=response)
 
-    def select_policy_manual(self, policy: str) -> None:
-        if self.auto_var.get():
-            self.auto_var.set(False)
-            self.toggle_auto_mode()
-        self.sequential_simulation = False
-        if self.is_mock:
-            self.ecg_policy = policy
-            simulation = SEQUENTIAL_SIMULATION[policy]
-            self.ecg_bpm = float(simulation["bpm"])
-            self.ecg_amplitude = float(simulation["amplitude"])
-            self.ecg_signal_ok = True
-            self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
-        self.highlight_button(policy)
-        self.worker.send_policy(policy)
-        self.lbl_active_policy.configure(text=f"Política Activa: {policy.upper()}")
-        self.update_displayed_image(policy)
-
     def highlight_button(self, policy: str) -> None:
         for current, button in self.buttons.items():
             button.configure(border_width=3 if current == policy else 0, border_color="#FFFFFF")
-
-    def stop_playback(self) -> None:
-        if self.auto_var.get():
-            self.auto_var.set(False)
-            self.toggle_auto_mode()
-        self.worker.stop_motors()
-        self.sequential_simulation = False
-        if self.is_mock:
-            self.ecg_policy = None
-            self.ecg_signal_ok = False
-            self.ecg_bpm = 0.0
-            self.ecg_amplitude = 0.0
-            self.lbl_bpm.configure(text="BPM: 0")
-            self.lbl_smooth.configure(text="Sin pulso")
-            self.lbl_delta.configure(text="Sin política activa")
-        self.lbl_active_policy.configure(text="Política Activa: DETENIDO")
-        self.highlight_button("")
-        self.update_displayed_image(None)
-
-    def toggle_auto_mode(self) -> None:
-        if self.auto_var.get():
-            self.sequential_simulation = True
-            self.orchestrator = DemoOrchestrator(self.worker, self.on_auto_policy_change, self.on_auto_tick)
-            self.orchestrator.start_demo()
-        elif self.orchestrator:
-            self.sequential_simulation = False
-            self.orchestrator.stop_demo()
-            self.orchestrator = None
-            self.timer_label.configure(text="Timer: --s")
-
-    def on_auto_policy_change(self, policy: str, duration: int) -> None:
-        self.after(
-            0,
-            lambda: self._update_auto_ui(policy) if self.sequential_simulation else None,
-        )
-
-    def _update_auto_ui(self, policy: str) -> None:
-        simulation = SEQUENTIAL_SIMULATION[policy]
-        self.ecg_policy = policy
-        self.ecg_signal_ok = True
-        self.ecg_transition_from_bpm = self.ecg_bpm
-        self.ecg_transition_from_amplitude = self.ecg_amplitude
-        self.ecg_target_bpm = float(simulation["bpm"])
-        self.ecg_target_amplitude = float(simulation["amplitude"])
-        self.ecg_transition_started_at = time.monotonic()
-        self.highlight_button(policy)
-        self.lbl_active_policy.configure(text=f"Política Activa (AUTO): {policy.upper()}")
-        self.update_displayed_image(policy)
-
-    def on_auto_tick(self, remaining: int) -> None:
-        self.after(0, lambda: self.timer_label.configure(text=f"Timer: {remaining}s"))
 
     def _animate_ecg(self) -> None:
         width = max(self.ecg_canvas.winfo_width(), 400)
@@ -569,6 +486,86 @@ class HapticDemoApp(ctk.CTk):
 
         self.after(50, self._animate_ecg)
 
+    def append_log(self, text: str) -> None:
+        print(text)
+
+
+# =============================================================================
+# MÓDULO DE CONTROL Y EVENTOS (LÓGICA / CONTROLADOR)
+# =============================================================================
+class HapticUIController:
+    """
+    Controlador que maneja el flujo de la aplicación, interacción del usuario,
+    el orquestador lógico (worker) y la actualización unificada de telemetría.
+    """
+    def select_policy_manual(self, policy: str) -> None:
+        if self.auto_var.get():
+            self.auto_var.set(False)
+            self.toggle_auto_mode()
+        self.sequential_simulation = False
+        if self.is_mock:
+            self.ecg_policy = policy
+            simulation = SEQUENTIAL_SIMULATION[policy]
+            self.ecg_bpm = float(simulation["bpm"])
+            self.ecg_amplitude = float(simulation["amplitude"])
+            self.ecg_signal_ok = True
+            self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
+        self.highlight_button(policy)
+        self.worker.send_policy(policy)
+        self.lbl_active_policy.configure(text=f"Política Activa: {policy.upper()}")
+        self.update_displayed_image(policy)
+
+    def stop_playback(self) -> None:
+        if self.auto_var.get():
+            self.auto_var.set(False)
+            self.toggle_auto_mode()
+        self.worker.stop_motors()
+        self.sequential_simulation = False
+        if self.is_mock:
+            self.ecg_policy = None
+            self.ecg_signal_ok = False
+            self.ecg_bpm = 0.0
+            self.ecg_amplitude = 0.0
+            self.lbl_bpm.configure(text="BPM: 0")
+            self.lbl_smooth.configure(text="Sin pulso")
+            self.lbl_delta.configure(text="Sin política activa")
+        self.lbl_active_policy.configure(text="Política Activa: DETENIDO")
+        self.highlight_button("")
+        self.update_displayed_image(None)
+
+    def toggle_auto_mode(self) -> None:
+        if self.auto_var.get():
+            self.sequential_simulation = True
+            self.orchestrator = DemoOrchestrator(self.worker, self.on_auto_policy_change, self.on_auto_tick)
+            self.orchestrator.start_demo()
+        elif self.orchestrator:
+            self.sequential_simulation = False
+            self.orchestrator.stop_demo()
+            self.orchestrator = None
+            self.timer_label.configure(text="Timer: --s")
+
+    def on_auto_policy_change(self, policy: str, duration: int) -> None:
+        self.after(
+            0,
+            lambda: self._update_auto_ui(policy) if self.sequential_simulation else None,
+        )
+
+    def _update_auto_ui(self, policy: str) -> None:
+        simulation = SEQUENTIAL_SIMULATION[policy]
+        self.ecg_policy = policy
+        self.ecg_signal_ok = True
+        self.ecg_transition_from_bpm = self.ecg_bpm
+        self.ecg_transition_from_amplitude = self.ecg_amplitude
+        self.ecg_target_bpm = float(simulation["bpm"])
+        self.ecg_target_amplitude = float(simulation["amplitude"])
+        self.ecg_transition_started_at = time.monotonic()
+        self.highlight_button(policy)
+        self.lbl_active_policy.configure(text=f"Política Activa (AUTO): {policy.upper()}")
+        self.update_displayed_image(policy)
+
+    def on_auto_tick(self, remaining: int) -> None:
+        self.after(0, lambda: self.timer_label.configure(text=f"Timer: {remaining}s"))
+
     def update_telemetry(self, data: Dict[str, str]) -> None:
         def update() -> None:
             # OVERRIDE con delta falso si estamos en Modo Automático
@@ -637,8 +634,42 @@ class HapticDemoApp(ctk.CTk):
 
         self.after(0, update)
 
-    def append_log(self, text: str) -> None:
-        print(text)
+
+# =============================================================================
+# APLICACIÓN PRINCIPAL (ENSAMBLADOR MVC)
+# =============================================================================
+class HapticDemoApp(ctk.CTk, HapticUIView, HapticUIController):
+    """
+    Clase principal que hereda de CustomTkinter, la Vista y el Controlador.
+    Mantiene la firma original exacta y ensambla la aplicación.
+    """
+    def __init__(self, worker: SerialWorkerThread, is_mock: bool = False):
+        super().__init__()
+        self.worker = worker
+        self.is_mock = is_mock
+        self.orchestrator: Optional[DemoOrchestrator] = None
+        suffix = " (MODO SIMULADOR / MOCK)" if is_mock else ""
+        self.title(f"Pulso Háptico - Panel de Control Demo{suffix}")
+        self.geometry("850x780")
+        self.configure(fg_color="#1a1e24")
+        self.worker.on_telemetry_received = self.update_telemetry
+        self.worker.on_log_message = self.append_log
+        
+        # Variables de estado y animación
+        self.ecg_bpm = 70.0
+        self.ecg_amplitude = 0.0
+        self.ecg_policy: Optional[str] = None
+        self.ecg_target_bpm = 70.0
+        self.ecg_target_amplitude = 0.0
+        self.ecg_transition_started_at = time.monotonic()
+        self.ecg_transition_from_bpm = 70.0
+        self.ecg_transition_from_amplitude = 0.0
+        self.ecg_signal_ok = False
+        self.sequential_simulation = False
+        
+        # Inicialización de interfaces y rutinas
+        self._build_ui(is_mock)
+        self._animate_ecg()
 
 
 def main() -> int:
