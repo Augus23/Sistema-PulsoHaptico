@@ -584,11 +584,8 @@ class HapticDemoApp(ctk.CTk):
                 else: suggested = "awareness"
                 data['policy'] = suggested
                 
-                baseline_str = data.get('baseline_bpm', '70')
-                if not baseline_str.isdigit() or baseline_str == '0':
-                    baseline_str = '70'
-                data['baseline_bpm'] = baseline_str
-                data['bpm'] = str(int(baseline_str) + int(fake_d))
+                data['baseline_bpm'] = '70'
+                data['bpm'] = str(70 + int(fake_d))
 
             if self.is_mock and self.ecg_policy is None and not self.auto_var.get():
                 self.ecg_signal_ok = False
