@@ -474,6 +474,7 @@ class HapticDemoApp(ctk.CTk):
         height = max(self.ecg_canvas.winfo_height(), 125)
         middle = height / 2
         self.ecg_canvas.delete("wave")
+        use_mock_visuals = self.is_mock or self.auto_var.get()
 
         if self.sequential_simulation:
             elapsed = time.monotonic() - self.ecg_transition_started_at
@@ -485,10 +486,10 @@ class HapticDemoApp(ctk.CTk):
                 self.ecg_target_amplitude - self.ecg_transition_from_amplitude
             ) * progress
 
-        if not self.ecg_signal_ok or (self.is_mock and self.ecg_policy is None):
+        if not self.ecg_signal_ok or (use_mock_visuals and self.ecg_policy is None):
             waiting_text = (
                 "Sin pulso - selecciona una política"
-                if self.is_mock and self.ecg_policy is None
+                if use_mock_visuals and self.ecg_policy is None
                 else "Esperando una señal de pulso..."
             )
             self.ecg_canvas.create_line(
@@ -505,7 +506,7 @@ class HapticDemoApp(ctk.CTk):
             period = 60.0 / bpm
             visible_seconds = 6.0
             now = time.time()
-            if self.is_mock:
+            if use_mock_visuals:
                 amplitude, policy_label = self.MOCK_ECG_POLICY_LEVELS.get(
                     self.ecg_policy, self.MOCK_ECG_POLICY_LEVELS["reassure"]
                 )
@@ -513,7 +514,7 @@ class HapticDemoApp(ctk.CTk):
                 amplitude = max(5.0, min(self.ecg_amplitude * 0.9, 38.0))
             points = []
 
-            if self.is_mock:
+            if use_mock_visuals:
                 for division in range(1, 12):
                     x = width * division / 12
                     color = "#26373a" if division % 3 == 0 else "#1c2a2d"
@@ -535,7 +536,7 @@ class HapticDemoApp(ctk.CTk):
             for x in range(0, width + 4, 4):
                 sample_time = now - visible_seconds + (x / width) * visible_seconds
                 beat_phase = (sample_time % period) / period
-                if self.is_mock:
+                if use_mock_visuals:
                     pulse = (
                         0.12 * math.exp(-((beat_phase - 0.18) / 0.05) ** 2)
                         - 0.12 * math.exp(-((beat_phase - 0.29) / 0.025) ** 2)
@@ -555,12 +556,12 @@ class HapticDemoApp(ctk.CTk):
 
             self.ecg_canvas.create_line(
                 *points,
-                fill="#8fcbb6" if self.is_mock else "#35e0c1",
-                width=2.5 if self.is_mock else 2,
+                fill="#8fcbb6" if use_mock_visuals else "#35e0c1",
+                width=2.5 if use_mock_visuals else 2,
                 smooth=True,
                 tags="wave",
             )
-            if not self.is_mock:
+            if not use_mock_visuals:
                 self.ecg_canvas.create_line(
                     0, middle, width, middle,
                     fill="#23444a", width=1, tags="wave"
@@ -570,8 +571,10 @@ class HapticDemoApp(ctk.CTk):
 
     def update_telemetry(self, data: Dict[str, str]) -> None:
         def update() -> None:
-            # OVERRIDE con delta falso si estamos en Modo Automático y es phase=run
-            if self.auto_var.get() and self.orchestrator and data.get("phase") == "run":
+            # OVERRIDE con delta falso si estamos en Modo Automático
+            if self.auto_var.get() and self.orchestrator:
+                data["phase"] = "run"
+                data["signal_ok"] = "1"
                 fake_d = self.orchestrator.fake_delta
                 data['delta'] = str(int(fake_d))
                 
@@ -581,9 +584,11 @@ class HapticDemoApp(ctk.CTk):
                 else: suggested = "awareness"
                 data['policy'] = suggested
                 
-                baseline_str = data.get('baseline_bpm', '0')
-                if baseline_str.isdigit():
-                    data['bpm'] = str(int(baseline_str) + int(fake_d))
+                baseline_str = data.get('baseline_bpm', '70')
+                if not baseline_str.isdigit() or baseline_str == '0':
+                    baseline_str = '70'
+                data['baseline_bpm'] = baseline_str
+                data['bpm'] = str(int(baseline_str) + int(fake_d))
 
             if self.is_mock and self.ecg_policy is None and not self.auto_var.get():
                 self.ecg_signal_ok = False
