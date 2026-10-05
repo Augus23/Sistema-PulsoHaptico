@@ -358,10 +358,10 @@ class HapticDemoApp(ctk.CTk):
 
     def _load_policy_images(self) -> Dict[str, Optional[ctk.CTkImage]]:
         names = {
-            "reassure": "Demo para 189.jpg",
-            "awareness": "Demo para 189 (3).jpg",
-            "breath": "Demo para 189 (1).jpg",
-            "calm_down": "Demo para 189 (2).jpg",
+            "awareness": "static/awareness.jpg",
+            "reassure": "static/reassure.jpg",
+            "breath": "static/breath.jpg",
+            "calm_down": "static/calm_down.jpg",
         }
         images: Dict[str, Optional[ctk.CTkImage]] = {}
         for policy, name in names.items():
