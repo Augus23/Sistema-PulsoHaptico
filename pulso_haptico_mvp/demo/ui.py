@@ -119,11 +119,17 @@ class HapticUIView:
     Clase responsable exclusivamente de la inicialización, manipulación visual,
     imágenes, animaciones de canvas y actualización gráfica (CustomTkinter).
     """
+    POLICY_LABELS = {
+        "awareness": "CONCIENCIA",
+        "reassure": "CONTENCIÓN",
+        "breath": "RESPIRACIÓN",
+        "calm_down": "CALMA",
+    }
     MOCK_ECG_POLICY_LEVELS = {
-        "awareness": (8.0, "AWARENESS - NIVEL 1"),
-        "reassure": (14.0, "REASSURE - NIVEL 2"),
-        "breath": (22.0, "BREATH - NIVEL 3"),
-        "calm_down": (31.0, "CALM DOWN - NIVEL 4"),
+        "awareness": (8.0, "CONCIENCIA - NIVEL 1"),
+        "reassure": (14.0, "CONTENCIÓN - NIVEL 2"),
+        "breath": (22.0, "RESPIRACIÓN - NIVEL 3"),
+        "calm_down": (31.0, "CALMA - NIVEL 4"),
     }
     POLICY_SCENARIOS = {
         "awareness": (
@@ -202,7 +208,7 @@ class HapticUIView:
         for policy in VALID_POLICIES:
             button = ctk.CTkButton(
                 button_container,
-                text=policy.upper(),
+                text=self.POLICY_LABELS[policy],
                 font=("Roboto", 13, "bold"),
                 fg_color=colors[policy],
                 hover_color=hover_colors[policy],
@@ -341,6 +347,7 @@ class HapticUIView:
         self.policy_image_dimensions: Dict[str, tuple[int, int]] = {}
         self.displayed_policy: Optional[str] = None
         self._displayed_image_size: Optional[tuple[int, int]] = None
+        self._displayed_image_policy: Optional[str] = None
         self.ctk_images = self._load_policy_images()
         self.update_displayed_image(None)
         self.image_frame.bind("<Configure>", self._resize_policy_content)
@@ -400,9 +407,10 @@ class HapticUIView:
                 round(image_dimensions[0] * image_scale),
                 round(image_dimensions[1] * image_scale),
             )
-            if image_size != self._displayed_image_size:
+            if image_size != self._displayed_image_size or policy != self._displayed_image_policy:
                 image.configure(size=image_size)
                 self._displayed_image_size = image_size
+                self._displayed_image_policy = policy
 
     def update_displayed_image(self, policy: Optional[str]) -> None:
         self.displayed_policy = policy
@@ -486,6 +494,13 @@ class HapticUIView:
                 amplitude *= visual_exaggeration
             else:
                 amplitude = max(5.0, min(self.ecg_amplitude * 0.9, 38.0))
+                policy_offset = {
+                    "awareness": 0.0,
+                    "reassure": 6.0,
+                    "breath": 12.0,
+                    "calm_down": 18.0,
+                }.get(self.ecg_policy, 0.0)
+                amplitude = min(amplitude + policy_offset, middle - 8.0)
             points = []
 
             if use_mock_visuals:
@@ -568,8 +583,8 @@ class HapticUIController:
             self.auto_var.set(False)
             self.toggle_auto_mode()
         self.sequential_simulation = False
+        self.ecg_policy = policy
         if self.is_mock:
-            self.ecg_policy = policy
             simulation = SEQUENTIAL_SIMULATION[policy]
             self.ecg_bpm = float(simulation["bpm"])
             self.ecg_amplitude = float(simulation["amplitude"])
@@ -577,7 +592,7 @@ class HapticUIController:
             self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
         self.highlight_button(policy)
         self.worker.send_policy(policy)
-        self.lbl_active_policy.configure(text=f"Política Activa: {policy.upper()}")
+        self.lbl_active_policy.configure(text=f"Política Activa: {self.POLICY_LABELS[policy]}")
         self.update_displayed_image(policy)
 
     def stop_playback(self) -> None:
@@ -586,8 +601,8 @@ class HapticUIController:
             self.toggle_auto_mode()
         self.worker.stop_motors()
         self.sequential_simulation = False
+        self.ecg_policy = None
         if self.is_mock:
-            self.ecg_policy = None
             self.ecg_signal_ok = False
             self.ecg_bpm = 0.0
             self.ecg_amplitude = 0.0
@@ -625,7 +640,9 @@ class HapticUIController:
         self.ecg_target_amplitude = float(simulation["amplitude"])
         self.ecg_transition_started_at = time.monotonic()
         self.highlight_button(policy)
-        self.lbl_active_policy.configure(text=f"Política Activa (AUTO): {policy.upper()}")
+        self.lbl_active_policy.configure(
+            text=f"Política Activa (AUTO): {self.POLICY_LABELS[policy]}"
+        )
         self.update_displayed_image(policy)
 
     def on_auto_tick(self, remaining: int) -> None:
