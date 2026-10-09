@@ -276,8 +276,8 @@ class HapticUIView:
             self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
         self.image_frame.pack(fill="both", expand=True, padx=20, pady=(3, 12))
-        self.image_frame.grid_columnconfigure(0, weight=3)
-        self.image_frame.grid_columnconfigure(1, weight=2)
+        self.image_frame.grid_columnconfigure(0, weight=7)
+        self.image_frame.grid_columnconfigure(1, weight=4)
         self.image_frame.grid_rowconfigure(2, weight=1)
         self.image_label = ctk.CTkLabel(
             self.image_frame,
@@ -303,6 +303,7 @@ class HapticUIView:
             font=("Roboto", 14, "bold"),
             text_color="#00ADB5",
             anchor="w",
+            justify="left",
         )
         self.scenario_level_label.grid(row=0, column=1, padx=(8, 16), pady=(18, 2), sticky="ew")
         self.scenario_title_label = ctk.CTkLabel(
@@ -384,10 +385,12 @@ class HapticUIView:
         if panel_width <= 1 or panel_height <= 1:
             return
 
-        text_width = max(240, int((panel_width - 36) * 0.4) - 24)
+        text_width = max(240, int((panel_width - 36) * 0.36) - 24)
         wrap_width = max(220, text_width - 12)
-        font_scale = min(1.45, max(1.0, text_width / 420))
-        self.scenario_level_label.configure(font=("Roboto", round(14 * font_scale), "bold"))
+        font_scale = min(1.35, max(1.0, text_width / 420))
+        self.scenario_level_label.configure(
+            font=("Roboto", round(14 * font_scale), "bold"), wraplength=wrap_width
+        )
         self.scenario_title_label.configure(
             font=("Roboto", round(27 * font_scale), "bold"), wraplength=wrap_width
         )
@@ -406,8 +409,8 @@ class HapticUIView:
         image = self.ctk_images.get(policy) if policy else None
         image_dimensions = self.policy_image_dimensions.get(policy) if policy else None
         if image and image_dimensions:
-            max_image_width = max(240, int((panel_width - 36) * 0.6) - 24)
-            max_image_height = max(180, int((panel_height - 40) * 0.72))
+            max_image_width = max(260, int((panel_width - 36) * 0.64) - 24)
+            max_image_height = max(200, int((panel_height - 40) * 0.82))
             image_scale = min(
                 max_image_width / image_dimensions[0],
                 max_image_height / image_dimensions[1],
@@ -458,7 +461,7 @@ class HapticUIView:
         height = max(self.ecg_canvas.winfo_height(), 125)
         middle = height / 2
         self.ecg_canvas.delete("wave")
-        use_mock_visuals = self.is_mock or self.auto_var.get()
+        use_mock_visuals = self.is_mock or self.auto_var.get() or self.ecg_policy is not None
 
         if self.sequential_simulation:
             elapsed = time.monotonic() - self.ecg_transition_started_at
