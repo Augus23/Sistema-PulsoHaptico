@@ -13,7 +13,7 @@ from PIL import Image
 from demo.config import (
     DEMO_STEP_DURATION_SEC,
     SEQUENTIAL_POLICIES,
-    SEQUENTIAL_SIMULATION,
+    BPM_CONFIG,
     VALID_POLICIES,
 )
 from demo.hardware import MockArduinoSerial, SerialWorkerThread
@@ -41,9 +41,7 @@ class DemoOrchestrator(threading.Thread):
         self.running = False
         self.current_policy_index = 0
         self.policy_changed_event = threading.Event()
-        self.fake_delta = 0.0
-        self.target_delta = 9.0
-        self.delta_step_value = 0.0
+        self.fake_bpm = float(BPM_CONFIG[SEQUENTIAL_POLICIES[0]]["bpm"])
 
     def start_demo(self) -> None:
         if not self.running:
@@ -56,59 +54,70 @@ class DemoOrchestrator(threading.Thread):
         self.policy_changed_event.set()
 
     def run(self) -> None:
-        direction = 1  # 1 = subiendo, -1 = bajando
-        self.fake_delta = 0.0
-        
+        self.current_policy_index = 0
+        direction = 1  # 1 = forward (index increases), -1 = backward (index decreases)
+        n = len(SEQUENTIAL_POLICIES)
+
+        # Start fake_bpm at the first policy's target
+        self.fake_bpm = float(BPM_CONFIG[SEQUENTIAL_POLICIES[0]]["bpm"])
+
         while self.running:
-            current_d = self.fake_delta
-            
-            # Máquina de estados para subir y bajar lentamente
-            if current_d >= 33.09:
-                direction = -1
-            elif current_d <= 8.91:
-                direction = 1
+            current_policy = SEQUENTIAL_POLICIES[self.current_policy_index]
+            target_bpm = float(BPM_CONFIG[current_policy]["bpm"])
 
-            if direction == 1:
-                if current_d < 5.0:
-                    self.target_delta = 9.05
-                elif current_d < 14.0:
-                    self.target_delta = 19.05
-                elif current_d < 26.0:
-                    self.target_delta = 33.05
-                else:
-                    self.target_delta = 33.1
-            else:
-                if current_d > 26.0:
-                    self.target_delta = 18.95
-                elif current_d > 14.0:
-                    self.target_delta = 8.95
-                else:
-                    self.target_delta = 8.9
+            # Notify UI that a new policy step is starting
+            self.on_change_cb(current_policy, int(DEMO_STEP_DURATION_SEC))
 
-            transition_time = max(1.0, float(DEMO_STEP_DURATION_SEC))
-            self.delta_step_value = abs(self.target_delta - self.fake_delta) / transition_time
+            # Linear ramp: fake_bpm goes from its current value to target_bpm
+            # over exactly DEMO_STEP_DURATION_SEC seconds, clamped once reached
+            start_bpm = self.fake_bpm
+            bpm_rate = (target_bpm - start_bpm) / DEMO_STEP_DURATION_SEC
 
             start_time = time.time()
-            last_tick = start_time
+
             while time.time() - start_time < DEMO_STEP_DURATION_SEC:
                 if not self.running:
                     return
                 if self.policy_changed_event.is_set():
                     self.policy_changed_event.clear()
                     break
-                
-                now = time.time()
-                dt = now - last_tick
-                last_tick = now
-                
-                if self.fake_delta < self.target_delta:
-                    self.fake_delta = min(self.target_delta, self.fake_delta + self.delta_step_value * dt)
-                elif self.fake_delta > self.target_delta:
-                    self.fake_delta = max(self.target_delta, self.fake_delta - self.delta_step_value * dt)
 
-                remaining = int(math.ceil(DEMO_STEP_DURATION_SEC - (now - start_time)))
+                now = time.time()
+                elapsed = now - start_time
+
+                # Animate fake_bpm; clamp so it never overshoots the target
+                new_bpm = start_bpm + bpm_rate * elapsed
+                if bpm_rate >= 0:
+                    self.fake_bpm = min(new_bpm, target_bpm)
+                else:
+                    self.fake_bpm = max(new_bpm, target_bpm)
+
+                remaining = max(0, int(math.ceil(DEMO_STEP_DURATION_SEC - elapsed)))
                 self.on_tick_cb(remaining)
                 time.sleep(0.1)
+
+            if not self.running:
+                return
+
+            # Snap to target exactly at step end
+            self.fake_bpm = target_bpm
+
+            # Advance policy index with ping-pong:
+            # change direction first when hitting the boundary, then move
+            if direction == 1:
+                if self.current_policy_index >= n - 1:
+                    direction = -1
+                    self.current_policy_index -= 1
+                else:
+                    self.current_policy_index += 1
+            else:
+                if self.current_policy_index <= 0:
+                    direction = 1
+                    self.current_policy_index += 1
+                else:
+                    self.current_policy_index -= 1
+
+
 
 
 # =============================================================================
@@ -505,9 +514,8 @@ class HapticUIController:
         self.sequential_simulation = False
         if self.is_mock:
             self.ecg_policy = policy
-            simulation = SEQUENTIAL_SIMULATION[policy]
-            self.ecg_bpm = float(simulation["bpm"])
-            self.ecg_amplitude = float(simulation["amplitude"])
+            self.ecg_amplitude = float(BPM_CONFIG[policy]["amplitude"])
+            self.ecg_bpm = float(BPM_CONFIG[policy]["bpm"])
             self.ecg_signal_ok = True
             self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
         self.highlight_button(policy)
@@ -551,14 +559,14 @@ class HapticUIController:
         )
 
     def _update_auto_ui(self, policy: str) -> None:
-        simulation = SEQUENTIAL_SIMULATION[policy]
         self.ecg_policy = policy
         self.ecg_signal_ok = True
         self.ecg_transition_from_bpm = self.ecg_bpm
         self.ecg_transition_from_amplitude = self.ecg_amplitude
-        self.ecg_target_bpm = float(simulation["bpm"])
-        self.ecg_target_amplitude = float(simulation["amplitude"])
+        self.ecg_target_bpm = float(BPM_CONFIG[policy]["bpm"])
+        self.ecg_target_amplitude = float(BPM_CONFIG[policy]["amplitude"])        
         self.ecg_transition_started_at = time.monotonic()
+        self.worker.send_policy(policy)
         self.highlight_button(policy)
         self.lbl_active_policy.configure(text=f"Política Activa (AUTO): {policy.upper()}")
         self.update_displayed_image(policy)
@@ -568,21 +576,16 @@ class HapticUIController:
 
     def update_telemetry(self, data: Dict[str, str]) -> None:
         def update() -> None:
-            # OVERRIDE con delta falso si estamos en Modo Automático
+            # OVERRIDE con bpm falso si estamos en Modo Automático
             if self.auto_var.get() and self.orchestrator:
                 data["phase"] = "run"
                 data["signal_ok"] = "1"
-                fake_d = self.orchestrator.fake_delta
-                data['delta'] = str(int(fake_d))
-                
-                if fake_d >= 33: suggested = "calm_down"
-                elif fake_d >= 19: suggested = "breath"
-                elif fake_d >= 9: suggested = "reassure"
-                else: suggested = "awareness"
-                data['policy'] = suggested
-                
-                data['baseline_bpm'] = '70'
-                data['bpm'] = str(70 + int(fake_d))
+                fake_bpm = self.orchestrator.fake_bpm
+                baseline_bpm = 70
+                data['delta'] = str(max(0, int(fake_bpm - baseline_bpm)))
+                data['policy'] = SEQUENTIAL_POLICIES[self.orchestrator.current_policy_index]
+                data['baseline_bpm'] = str(baseline_bpm)
+                data['bpm'] = str(int(fake_bpm))
 
             if self.is_mock and self.ecg_policy is None and not self.auto_var.get():
                 self.ecg_signal_ok = False
@@ -622,15 +625,8 @@ class HapticUIController:
                 self.lbl_smooth.configure(text=f"Beat average: {data.get('beat_avg', '--')}")
                 self.lbl_delta.configure(text=f"Samples: {data.get('baseline_samples', '--')}")
 
-            if self.auto_var.get():
-                suggested = data.get("policy")
-                current = self.lbl_active_policy.cget("text").split(": ")[-1].lower()
-                if suggested in VALID_POLICIES and suggested != current:
-                    is_initial_sync = current not in VALID_POLICIES
-                    self.worker.send_policy(suggested)
-                    self._update_auto_ui(suggested)
-                    if self.orchestrator and not is_initial_sync:
-                        self.orchestrator.policy_changed_event.set()
+            # Policy changes in auto mode are driven exclusively by the orchestrator
+            # (via on_change_cb → _update_auto_ui). No reactive switch needed here.
 
         self.after(0, update)
 
