@@ -490,7 +490,10 @@ class HapticUIView:
             )
         else:
             bpm = max(self.ecg_bpm, 40.0)
-            period = 60.0 / bpm
+            if self.auto_var.get():
+                period = 1.4
+            else:
+                period = 60.0 / bpm
             visible_seconds = 6.0
             now = time.time()
             if use_mock_visuals:
