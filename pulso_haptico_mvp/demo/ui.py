@@ -128,11 +128,17 @@ class HapticUIView:
     Clase responsable exclusivamente de la inicialización, manipulación visual,
     imágenes, animaciones de canvas y actualización gráfica (CustomTkinter).
     """
+    POLICY_LABELS = {
+        "awareness": "CONCIENCIA",
+        "reassure": "CONTENCIÓN",
+        "breath": "RESPIRACIÓN",
+        "calm_down": "CALMA",
+    }
     MOCK_ECG_POLICY_LEVELS = {
-        "awareness": (8.0, "AWARENESS - NIVEL 1"),
-        "reassure": (14.0, "REASSURE - NIVEL 2"),
-        "breath": (22.0, "BREATH - NIVEL 3"),
-        "calm_down": (31.0, "CALM DOWN - NIVEL 4"),
+        "awareness": (8.0, "CONCIENCIA - NIVEL 1"),
+        "reassure": (14.0, "CONTENCIÓN - NIVEL 2"),
+        "breath": (22.0, "RESPIRACIÓN - NIVEL 3"),
+        "calm_down": (31.0, "CALMA - NIVEL 4"),
     }
     POLICY_SCENARIOS = {
         "awareness": (
@@ -211,7 +217,7 @@ class HapticUIView:
         for policy in VALID_POLICIES:
             button = ctk.CTkButton(
                 button_container,
-                text=policy.upper(),
+                text=self.POLICY_LABELS[policy],
                 font=("Roboto", 13, "bold"),
                 fg_color=colors[policy],
                 hover_color=hover_colors[policy],
@@ -279,7 +285,7 @@ class HapticUIView:
             font=("Roboto", 13, "italic"),
             text_color="#888888",
         )
-        self.image_label.grid(row=0, column=0, rowspan=5, padx=(12, 10), pady=12, sticky="nsew")
+        self.image_label.grid(row=0, column=0, rowspan=5, padx=(12, 10), pady=12, sticky="n")
         self.image_placeholder_label = ctk.CTkLabel(
             self.image_frame,
             text="Selecciona una política para visualizar su estado",
@@ -289,12 +295,12 @@ class HapticUIView:
             wraplength=300,
         )
         self.image_placeholder_label.grid(
-            row=0, column=0, rowspan=5, padx=(20, 18), pady=12, sticky="nsew"
+            row=0, column=0, rowspan=5, padx=(20, 18), pady=12, sticky="n"
         )
         self.scenario_level_label = ctk.CTkLabel(
             self.image_frame,
             text="SIN POLITICA ACTIVA",
-            font=("Roboto", 11, "bold"),
+            font=("Roboto", 14, "bold"),
             text_color="#00ADB5",
             anchor="w",
         )
@@ -302,27 +308,27 @@ class HapticUIView:
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
             text="Escenas cotidianas",
-            font=("Roboto", 18, "bold"),
+            font=("Roboto", 27, "bold"),
             text_color="#EEEEEE",
             anchor="w",
             justify="left",
-            wraplength=270,
+            wraplength=320,
         )
         self.scenario_title_label.grid(row=1, column=1, padx=(8, 16), pady=(0, 8), sticky="ew")
         self.scenario_description_label = ctk.CTkLabel(
             self.image_frame,
             text="Selecciona una politica para ver una situacion posible asociada a ella.",
-            font=("Roboto", 13),
+            font=("Roboto", 18),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
-            wraplength=270,
+            wraplength=320,
         )
         self.scenario_description_label.grid(row=2, column=1, padx=(8, 16), pady=(0, 12), sticky="new")
         self.scenario_support_label = ctk.CTkLabel(
             self.image_frame,
             text="ACOMPAÑAMIENTO HAPTICO",
-            font=("Roboto", 11, "bold"),
+            font=("Roboto", 14, "bold"),
             text_color="#9FC7B7",
             anchor="w",
         )
@@ -330,25 +336,30 @@ class HapticUIView:
         self.scenario_response_label = ctk.CTkLabel(
             self.image_frame,
             text="",
-            font=("Roboto", 13),
+            font=("Roboto", 18),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
-            wraplength=270,
+            wraplength=320,
         )
         self.scenario_response_label.grid(row=4, column=1, padx=(8, 16), pady=(0, 10), sticky="new")
         self.scenario_note_label = ctk.CTkLabel(
             self.image_frame,
             text="Ejemplos ilustrativos; cada persona vive los estimulos de manera distinta.",
-            font=("Roboto", 10, "italic"),
+            font=("Roboto", 13, "italic"),
             text_color="#899895",
             anchor="w",
             justify="left",
-            wraplength=270,
+            wraplength=320,
         )
         self.scenario_note_label.grid(row=5, column=1, padx=(8, 16), pady=(0, 16), sticky="ew")
+        self.policy_image_dimensions: Dict[str, tuple[int, int]] = {}
+        self.displayed_policy: Optional[str] = None
+        self._displayed_image_size: Optional[tuple[int, int]] = None
+        self._displayed_image_policy: Optional[str] = None
         self.ctk_images = self._load_policy_images()
         self.update_displayed_image(None)
+        self.image_frame.bind("<Configure>", self._resize_policy_content)
 
     def _load_policy_images(self) -> Dict[str, Optional[ctk.CTkImage]]:
         names = {
@@ -360,14 +371,60 @@ class HapticUIView:
         images: Dict[str, Optional[ctk.CTkImage]] = {}
         for policy, name in names.items():
             try:
-                image = Image.open(Path(__file__).resolve().parent / name)
-                images[policy] = ctk.CTkImage(light_image=image, dark_image=image, size=(450, 300))
+                image = Image.open(Path(__file__).resolve().parent / name).copy()
+                self.policy_image_dimensions[policy] = image.size
+                images[policy] = ctk.CTkImage(light_image=image, dark_image=image, size=image.size)
             except (FileNotFoundError, OSError):
                 images[policy] = None
         return images
 
+    def _resize_policy_content(self, _event=None) -> None:
+        panel_width = self.image_frame.winfo_width()
+        panel_height = self.image_frame.winfo_height()
+        if panel_width <= 1 or panel_height <= 1:
+            return
+
+        text_width = max(240, int((panel_width - 36) * 0.4) - 24)
+        wrap_width = max(220, text_width - 12)
+        font_scale = min(1.45, max(1.0, text_width / 420))
+        self.scenario_level_label.configure(font=("Roboto", round(14 * font_scale), "bold"))
+        self.scenario_title_label.configure(
+            font=("Roboto", round(27 * font_scale), "bold"), wraplength=wrap_width
+        )
+        self.scenario_description_label.configure(
+            font=("Roboto", round(18 * font_scale),), wraplength=wrap_width
+        )
+        self.scenario_support_label.configure(font=("Roboto", round(14 * font_scale), "bold"))
+        self.scenario_response_label.configure(
+            font=("Roboto", round(18 * font_scale),), wraplength=wrap_width
+        )
+        self.scenario_note_label.configure(
+            font=("Roboto", round(13 * font_scale), "italic"), wraplength=wrap_width
+        )
+
+        policy = self.displayed_policy
+        image = self.ctk_images.get(policy) if policy else None
+        image_dimensions = self.policy_image_dimensions.get(policy) if policy else None
+        if image and image_dimensions:
+            max_image_width = max(240, int((panel_width - 36) * 0.6) - 24)
+            max_image_height = max(180, int((panel_height - 40) * 0.72))
+            image_scale = min(
+                max_image_width / image_dimensions[0],
+                max_image_height / image_dimensions[1],
+            )
+            image_size = (
+                round(image_dimensions[0] * image_scale),
+                round(image_dimensions[1] * image_scale),
+            )
+            if image_size != self._displayed_image_size or policy != self._displayed_image_policy:
+                image.configure(size=image_size)
+                self._displayed_image_size = image_size
+                self._displayed_image_policy = policy
+
     def update_displayed_image(self, policy: Optional[str]) -> None:
+        self.displayed_policy = policy
         if policy not in self.POLICY_SCENARIOS:
+            self._displayed_image_size = None
             self.image_label.grid_remove()
             self.image_placeholder_label.grid()
             self.scenario_level_label.configure(text="SIN POLITICA ACTIVA")
@@ -390,6 +447,7 @@ class HapticUIView:
         self.scenario_description_label.configure(text=description)
         self.scenario_support_label.configure(text="ACOMPANAMIENTO HAPTICO")
         self.scenario_response_label.configure(text=response)
+        self._resize_policy_content()
 
     def highlight_button(self, policy: str) -> None:
         for current, button in self.buttons.items():
@@ -436,8 +494,22 @@ class HapticUIView:
                 amplitude, policy_label = self.MOCK_ECG_POLICY_LEVELS.get(
                     self.ecg_policy, self.MOCK_ECG_POLICY_LEVELS["reassure"]
                 )
+                visual_exaggeration = {
+                    "awareness": 1.2,
+                    "reassure": 1.8,
+                    "breath": 1.9,
+                    "calm_down": 2.5,
+                }.get(self.ecg_policy, 1.0)
+                amplitude *= visual_exaggeration
             else:
                 amplitude = max(5.0, min(self.ecg_amplitude * 0.9, 38.0))
+                policy_offset = {
+                    "awareness": 0.0,
+                    "reassure": 6.0,
+                    "breath": 12.0,
+                    "calm_down": 18.0,
+                }.get(self.ecg_policy, 0.0)
+                amplitude = min(amplitude + policy_offset, middle - 8.0)
             points = []
 
             if use_mock_visuals:
@@ -470,6 +542,14 @@ class HapticUIView:
                         - 0.20 * math.exp(-((beat_phase - 0.37) / 0.028) ** 2)
                         + 0.24 * math.exp(-((beat_phase - 0.60) / 0.09) ** 2)
                     )
+                    if self.ecg_policy == "calm_down":
+                        pulse *= 2.15
+                    elif self.ecg_policy == "breath":
+                        pulse *= 1.55
+                    elif self.ecg_policy == "reassure":
+                        pulse *= 1.55
+                    elif self.ecg_policy == "awareness":
+                        pulse *= 1.25
                 else:
                     pulse = (
                         0.14 * math.exp(-((beat_phase - 0.18) / 0.045) ** 2)
@@ -512,6 +592,7 @@ class HapticUIController:
             self.auto_var.set(False)
             self.toggle_auto_mode()
         self.sequential_simulation = False
+        self.ecg_policy = policy
         if self.is_mock:
             self.ecg_policy = policy
             self.ecg_amplitude = float(BPM_CONFIG[policy]["amplitude"])
@@ -520,7 +601,7 @@ class HapticUIController:
             self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
         self.highlight_button(policy)
         self.worker.send_policy(policy)
-        self.lbl_active_policy.configure(text=f"Política Activa: {policy.upper()}")
+        self.lbl_active_policy.configure(text=f"Política Activa: {self.POLICY_LABELS[policy]}")
         self.update_displayed_image(policy)
 
     def stop_playback(self) -> None:
@@ -529,8 +610,8 @@ class HapticUIController:
             self.toggle_auto_mode()
         self.worker.stop_motors()
         self.sequential_simulation = False
+        self.ecg_policy = None
         if self.is_mock:
-            self.ecg_policy = None
             self.ecg_signal_ok = False
             self.ecg_bpm = 0.0
             self.ecg_amplitude = 0.0
@@ -568,7 +649,9 @@ class HapticUIController:
         self.ecg_transition_started_at = time.monotonic()
         self.worker.send_policy(policy)
         self.highlight_button(policy)
-        self.lbl_active_policy.configure(text=f"Política Activa (AUTO): {policy.upper()}")
+        self.lbl_active_policy.configure(
+            text=f"Política Activa (AUTO): {self.POLICY_LABELS[policy]}"
+        )
         self.update_displayed_image(policy)
 
     def on_auto_tick(self, remaining: int) -> None:
