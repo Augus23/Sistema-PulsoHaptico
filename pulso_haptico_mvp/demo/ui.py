@@ -4,7 +4,7 @@ import time
 import math
 import sys
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import customtkinter as ctk
 import tkinter as tk
@@ -17,7 +17,7 @@ from demo.config import (
     VALID_POLICIES,
 )
 from demo.hardware import MockArduinoSerial, SerialWorkerThread
-from demo.protocol import load_catalog
+from demo.protocol import build_effective_pattern, load_catalog
 
 
 ctk.set_appearance_mode("dark")
@@ -211,9 +211,9 @@ class HapticUIView:
                 button_container,
                 text=self.POLICY_LABELS[policy],
                 font=("Roboto", 13, "bold"),
-                fg_color="#FFFFFF",
-                hover_color="#E6E6E6",
-                text_color="#000000",
+                fg_color="#F3D77A",
+                hover_color="#E5C45C",
+                text_color="#403718",
                 corner_radius=8,
                 command=lambda selected=policy: self.select_policy_manual(selected),
             )
@@ -234,9 +234,9 @@ class HapticUIView:
             button_container,
             text="VER IMÁGENES",
             font=("Roboto", 13, "bold"),
-            fg_color="#FFFFFF",
-            hover_color="#E6E6E6",
-            text_color="#000000",
+            fg_color="#F3D77A",
+            hover_color="#E5C45C",
+            text_color="#403718",
             corner_radius=8,
             command=self.open_policy_gallery,
         ).pack(side="right", padx=6)
@@ -288,17 +288,30 @@ class HapticUIView:
             padx=12, pady=12, sticky="nsew"
         )
         self.motor_canvas.bind("<Configure>", self._resize_policy_content)
+        self.motor_info_frame = ctk.CTkFrame(self.image_frame, fg_color="transparent")
+        self.motor_info_frame.grid(
+            row=0, column=1, padx=(4, 16), pady=(30, 0), sticky="n"
+        )
         self.motor_policy_label = ctk.CTkLabel(
-            self.image_frame,
+            self.motor_info_frame,
             text="Política Activa:\nNINGUNA",
             font=("Roboto", 16, "bold"),
             text_color="#00ADB5",
             justify="center",
-            wraplength=150,
+            wraplength=145,
         )
-        self.motor_policy_label.grid(
-            row=0, column=1, padx=(4, 16), pady=(30, 0), sticky="n"
+        self.motor_policy_label.pack(pady=(0, 8))
+        self.motor_policy_description_label = ctk.CTkLabel(
+            self.motor_info_frame,
+            text="",
+            font=("Roboto", 20),
+            text_color="#D2D8D6",
+            anchor="center",
+            justify="center",
+            wraplength=145,
+            width=145,
         )
+        self.motor_policy_description_label.pack()
         self.scenario_level_label = ctk.CTkLabel(
             self.image_frame,
             text="SIN POLITICA ACTIVA",
@@ -366,6 +379,9 @@ class HapticUIView:
         ):
             label.grid_remove()
         self.displayed_policy: Optional[str] = None
+        self.motor_active_motors: set[int] = set()
+        self.motor_sequence_token = 0
+        self.motor_animation_after_id: Optional[str] = None
         self.policy_gallery_window: Optional[ctk.CTkToplevel] = None
         self.policy_gallery_images: list[ctk.CTkImage] = []
         self.update_displayed_image(None)
@@ -378,24 +394,18 @@ class HapticUIView:
 
         gallery = ctk.CTkToplevel(self)
         gallery.title("Imágenes de políticas")
-        gallery.geometry("980x720")
-        gallery.minsize(760, 560)
+        gallery.geometry("1100x850")
+        gallery.minsize(900, 760)
         gallery.configure(fg_color="#1a1e24")
         self.policy_gallery_window = gallery
         self.policy_gallery_images = []
 
         ctk.CTkLabel(
             gallery,
-            text="IMÁGENES ASOCIADAS A CADA POLÍTICA",
+            text="Del reconocimiento sutil a la contención en estados de alta activación sensorial",
             font=("Roboto", 22, "bold"),
             text_color="#00ADB5",
-        ).pack(pady=(18, 4))
-        ctk.CTkLabel(
-            gallery,
-            text="Referencia visual de las cuatro políticas hápticas",
-            font=("Roboto", 14),
-            text_color="#D2D8D6",
-        ).pack(pady=(0, 12))
+        ).pack(pady=(18, 12))
 
         cards_frame = ctk.CTkFrame(gallery, fg_color="transparent")
         cards_frame.pack(fill="both", expand=True, padx=22, pady=(0, 18))
@@ -424,12 +434,6 @@ class HapticUIView:
                 sticky="nsew",
             )
             card.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(
-                card,
-                text=self.POLICY_LABELS[policy],
-                font=("Roboto", 16, "bold"),
-                text_color="#00ADB5",
-            ).pack(pady=(10, 4))
 
             image_label = ctk.CTkLabel(card, text="Imagen no encontrada")
             try:
@@ -437,7 +441,7 @@ class HapticUIView:
                 ctk_image = ctk.CTkImage(
                     light_image=image,
                     dark_image=image,
-                    size=(280, 155),
+                    size=(400, 225),
                 )
                 self.policy_gallery_images.append(ctk_image)
                 image_label.configure(image=ctk_image, text="")
@@ -449,10 +453,10 @@ class HapticUIView:
             ctk.CTkLabel(
                 card,
                 text=description,
-                font=("Roboto", 12),
+                font=("Roboto", 16),
                 text_color="#D2D8D6",
                 justify="left",
-                wraplength=360,
+                wraplength=380,
             ).pack(fill="x", padx=14, pady=(4, 12))
 
         def close_gallery() -> None:
@@ -474,12 +478,7 @@ class HapticUIView:
         width = max(self.motor_canvas.winfo_width(), 360)
         height = max(self.motor_canvas.winfo_height(), 260)
         self.motor_canvas.delete("motor")
-        active_motors = {
-            "awareness": {1, 2, 4, 5},
-            "reassure": {1, 2, 5, 6},
-            "breath": {1, 2, 3, 4, 5, 6},
-            "calm_down": {1, 2, 3, 4, 5, 6},
-        }.get(policy, set())
+        active_motors = self.motor_active_motors if policy else set()
         self.motor_canvas.create_text(
             width / 2,
             24,
@@ -522,24 +521,87 @@ class HapticUIView:
                 x, y, text=f"M{motor}", fill="#FFFFFF",
                 font=("Roboto", 11, "bold"), tags="motor"
             )
-        status = (
-            "Selecciona una política"
-            if not active_motors
-            else "Motores activos: " + ", ".join(f"M{motor}" for motor in sorted(active_motors))
+    def _cancel_motor_sequence(self) -> None:
+        self.motor_sequence_token += 1
+        if self.motor_animation_after_id is not None:
+            self.after_cancel(self.motor_animation_after_id)
+            self.motor_animation_after_id = None
+        self.motor_active_motors = set()
+
+    def _start_motor_sequence(self, policy: str) -> None:
+        self._cancel_motor_sequence()
+        token = self.motor_sequence_token
+        pattern = build_effective_pattern(self.worker.catalog[policy])
+        self._show_motor_step(
+            policy,
+            pattern.human_steps,
+            0,
+            token,
+            0,
+            pattern.repeat_count,
+            pattern.cooldown_ms,
         )
-        self.motor_canvas.create_text(
-            width / 2,
-            height - 12,
-            text=status,
-            fill="#B8C6C5",
-            font=("Roboto", 10),
-            tags="motor",
+
+    def _show_motor_step(
+        self,
+        policy: str,
+        steps: list[Dict[str, Any]],
+        index: int,
+        token: int,
+        repeat_index: int,
+        repeat_count: int,
+        cooldown_ms: int,
+    ) -> None:
+        if token != self.motor_sequence_token or self.displayed_policy != policy:
+            return
+
+        if index >= len(steps):
+            if repeat_index + 1 < repeat_count:
+                self.motor_active_motors = set()
+                self._draw_motor_map(policy)
+                self.motor_animation_after_id = self.after(
+                    cooldown_ms,
+                    lambda: self._show_motor_step(
+                        policy,
+                        steps,
+                        0,
+                        token,
+                        repeat_index + 1,
+                        repeat_count,
+                        cooldown_ms,
+                    ),
+                )
+                return
+            self.motor_active_motors = set()
+            self.motor_animation_after_id = None
+            self._draw_motor_map(policy)
+            return
+
+        step = steps[index]
+        mask = int(step["mask"])
+        self.motor_active_motors = {
+            channel + 1 for channel in range(6) if mask & (1 << channel)
+        }
+        self._draw_motor_map(policy)
+        self.motor_animation_after_id = self.after(
+            int(step["duration_ms"]),
+            lambda: self._show_motor_step(
+                policy,
+                steps,
+                index + 1,
+                token,
+                repeat_index,
+                repeat_count,
+                cooldown_ms,
+            ),
         )
 
     def update_displayed_image(self, policy: Optional[str]) -> None:
+        self._cancel_motor_sequence()
         self.displayed_policy = policy
         if policy not in self.POLICY_SCENARIOS:
             self._draw_motor_map(None)
+            self.motor_policy_description_label.configure(text="")
             self.scenario_level_label.configure(text="SIN POLITICA ACTIVA")
             self.scenario_title_label.configure(text="Escenas cotidianas")
             self.scenario_description_label.configure(
@@ -551,6 +613,7 @@ class HapticUIView:
 
         self._draw_motor_map(policy)
         title, description, response = self.POLICY_SCENARIOS[policy]
+        self.motor_policy_description_label.configure(text=description)
         _, level_label = self.MOCK_ECG_POLICY_LEVELS[policy]
         self.scenario_level_label.configure(text=level_label)
         self.scenario_title_label.configure(text=title)
@@ -718,6 +781,7 @@ class HapticUIController:
             text=f"Política Activa:\n{self.POLICY_LABELS[policy]}"
         )
         self.update_displayed_image(policy)
+        self._start_motor_sequence(policy)
 
     def stop_playback(self) -> None:
         if self.auto_var.get():
@@ -768,6 +832,7 @@ class HapticUIController:
             text=f"Política Activa (AUTO):\n{self.POLICY_LABELS[policy]}"
         )
         self.update_displayed_image(policy)
+        self._start_motor_sequence(policy)
 
     def on_auto_tick(self, remaining: int) -> None:
         self.after(0, lambda: self.timer_label.configure(text=f"Timer: {remaining}s"))
