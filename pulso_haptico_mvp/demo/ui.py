@@ -162,6 +162,12 @@ class HapticUIView:
             "La secuencia acompaña la autorregulacion, respetando lo que le resulte comodo a la persona.",
         ),
     }
+    MOTOR_POLICY_DESCRIPTIONS = {
+        "awareness": "En medio de la rutina, cuando el ruido o el movimiento empiezan a generar una incomodidad leve, el dispositivo da un toque suave y rápido en el brazo, como un \"subrayado\" sutil para avisarte que tu cuerpo está empezando a notarlo, sin apurarte ni corregirte nada todavía.",
+        "reassure": "Frente a un cambio inesperado en la rutina o cuando hay incertidumbre, pero querés mantener la tranquilidad, el dispositivo da un toque muy suave y repartido en el brazo, como una presencia discreta que te confirma que todo está bien y te ayuda a mantener el equilibrio",
+        "breath": "En situaciones muy estimulantes o concurridas (como una exposición pública) donde la ansiedad empieza a subir, el dispositivo te acompaña con una vibración en forma de \"ola\" que sube, se mantiene un instante y baja suavemente, invitándote a regular el ritmo de tu respiración sin apurarte",
+        "calm_down": "Cuando se acumulan demasiados estímulos, el nivel de estrés es alto y el cuerpo necesita hacer una pausa o buscar un lugar más tranquilo, el dispositivo te abraza con una vibración amplia que empieza firme y se va apagando progresivamente, ayudándote a bajar la intensidad de forma segura y sin sobresaltos.",
+    }
 
     def _build_ui(self, is_mock: bool) -> None:
         if is_mock:
@@ -211,9 +217,9 @@ class HapticUIView:
                 button_container,
                 text=self.POLICY_LABELS[policy],
                 font=("Roboto", 13, "bold"),
-                fg_color="#F3D77A",
-                hover_color="#E5C45C",
-                text_color="#403718",
+                fg_color="#00ADB5",
+                hover_color="#008C92",
+                text_color="#FFFFFF",
                 corner_radius=8,
                 command=lambda selected=policy: self.select_policy_manual(selected),
             )
@@ -234,9 +240,9 @@ class HapticUIView:
             button_container,
             text="VER IMÁGENES",
             font=("Roboto", 13, "bold"),
-            fg_color="#F3D77A",
-            hover_color="#E5C45C",
-            text_color="#403718",
+            fg_color="#00ADB5",
+            hover_color="#008C92",
+            text_color="#FFFFFF",
             corner_radius=8,
             command=self.open_policy_gallery,
         ).pack(side="right", padx=6)
@@ -274,8 +280,8 @@ class HapticUIView:
         self.image_frame.pack(fill="both", expand=True, padx=20, pady=(3, 12))
         button_frame.pack_forget()
         button_frame.pack(fill="x", padx=20, pady=3, before=self.image_frame)
-        self.image_frame.grid_columnconfigure(0, weight=4)
-        self.image_frame.grid_columnconfigure(1, weight=1)
+        self.image_frame.grid_columnconfigure(0, weight=3)
+        self.image_frame.grid_columnconfigure(1, weight=2)
         self.image_frame.grid_rowconfigure(0, weight=1)
         self.motor_canvas = tk.Canvas(
             self.image_frame,
@@ -298,7 +304,7 @@ class HapticUIView:
             font=("Roboto", 16, "bold"),
             text_color="#00ADB5",
             justify="center",
-            wraplength=145,
+            wraplength=270,
         )
         self.motor_policy_label.pack(pady=(0, 8))
         self.motor_policy_description_label = ctk.CTkLabel(
@@ -308,8 +314,8 @@ class HapticUIView:
             text_color="#D2D8D6",
             anchor="center",
             justify="center",
-            wraplength=145,
-            width=145,
+            wraplength=270,
+            width=270,
         )
         self.motor_policy_description_label.pack()
         self.scenario_level_label = ctk.CTkLabel(
@@ -394,8 +400,8 @@ class HapticUIView:
 
         gallery = ctk.CTkToplevel(self)
         gallery.title("Imágenes de políticas")
-        gallery.geometry("1100x850")
-        gallery.minsize(900, 760)
+        gallery.geometry("1150x920")
+        gallery.minsize(980, 820)
         gallery.configure(fg_color="#1a1e24")
         self.policy_gallery_window = gallery
         self.policy_gallery_images = []
@@ -441,22 +447,22 @@ class HapticUIView:
                 ctk_image = ctk.CTkImage(
                     light_image=image,
                     dark_image=image,
-                    size=(400, 225),
+                    size=(440, 248),
                 )
                 self.policy_gallery_images.append(ctk_image)
                 image_label.configure(image=ctk_image, text="")
             except (FileNotFoundError, OSError):
                 pass
-            image_label.pack(fill="both", expand=True, padx=12, pady=6)
+            image_label.pack(anchor="n", padx=12, pady=(12, 6))
 
             _, description, _ = self.POLICY_SCENARIOS[policy]
             ctk.CTkLabel(
                 card,
                 text=description,
-                font=("Roboto", 16),
+                font=("Roboto", 19),
                 text_color="#D2D8D6",
                 justify="left",
-                wraplength=380,
+                wraplength=410,
             ).pack(fill="x", padx=14, pady=(4, 12))
 
         def close_gallery() -> None:
@@ -613,7 +619,8 @@ class HapticUIView:
 
         self._draw_motor_map(policy)
         title, description, response = self.POLICY_SCENARIOS[policy]
-        self.motor_policy_description_label.configure(text=description)
+        motor_description = self.MOTOR_POLICY_DESCRIPTIONS.get(policy, description)
+        self.motor_policy_description_label.configure(text=motor_description)
         _, level_label = self.MOCK_ECG_POLICY_LEVELS[policy]
         self.scenario_level_label.configure(text=level_label)
         self.scenario_title_label.configure(text=title)
