@@ -140,8 +140,8 @@ class HapticUIView:
     # Drop-in replacement for HapticUIView._build_ui (everything else in the file stays untouched).
     def _build_ui(self, is_mock: bool) -> None:
         # ---- Root layout: left column (everything) + right column (motors grid) ----
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0, minsize=360)
+        self.grid_columnconfigure(0, weight=11, uniform="main_cols")
+        self.grid_columnconfigure(1, weight=9, uniform="main_cols")
         self.grid_rowconfigure(0, weight=1)
 
         left_panel = ctk.CTkFrame(self, fg_color="transparent")
@@ -149,7 +149,7 @@ class HapticUIView:
 
         motor_panel = ctk.CTkFrame(
             self, fg_color="#1f242b", border_width=2, border_color="#2a3038",
-            corner_radius=12, width=360,
+            corner_radius=12, width=100,
         )
         motor_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 20), pady=(8, 14))
         motor_panel.grid_propagate(False)
@@ -289,7 +289,7 @@ class HapticUIView:
         # ---- RIGHT SIDE: motors grid, fills the full height ----
         self.motor_canvas = tk.Canvas(
             motor_panel,
-            width=360,
+            width=100,
             bg="#10161b",
             highlightthickness=1,
             highlightbackground="#2a3038",
@@ -547,14 +547,15 @@ class HapticUIView:
             font=("Roboto", 13, "bold"),
             tags="motor",
         )
-        left = width * 0.38
-        right = width * 0.62
+        radius = max(18, min(40, int(min(width, height) * 0.07)))
+        left = width * 0.30
+        right = width * 0.70
         top = 62
         bottom = height - 30
         self.motor_canvas.create_rectangle(
-            left - 38,
+            left - radius - 11,
             top - 20,
-            right + 38,
+            right + radius + 11,
             bottom + 20,
             outline="#607177",
             width=2,
@@ -568,7 +569,6 @@ class HapticUIView:
             (right, (top + bottom) / 2),
             (right, bottom),
         ]
-        radius = max(18, min(27, int(width * 0.06)))
         for motor, (x, y) in enumerate(positions, start=1):
             active = motor in active_motors
             fill = "#00ADB5" if active else "#39464b"
@@ -970,7 +970,8 @@ class HapticDemoApp(ctk.CTk, HapticUIView, HapticUIController):
         self.orchestrator: Optional[DemoOrchestrator] = None
         suffix = " (MODO SIMULADOR / MOCK)" if is_mock else ""
         self.title(f"Pulso Háptico - Panel de Control Demo{suffix}")
-        self.geometry("850x780")
+        self.geometry("1200x780")
+        self.minsize(1000, 700)
         self.configure(fg_color="#1a1e24")
         self.worker.on_telemetry_received = self.update_telemetry
         self.worker.on_log_message = self.append_log
