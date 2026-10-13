@@ -22,6 +22,7 @@ from demo.constants import (
     POLICY_SCENARIOS,
     MOCK_ECG_POLICY_LEVELS,
     MOTOR_POLICY_DESCRIPTIONS,
+    POLICY_COLORS,
 )
 
 
@@ -136,212 +137,252 @@ class HapticUIView:
     """
    
 
+    # Drop-in replacement for HapticUIView._build_ui (everything else in the file stays untouched).
     def _build_ui(self, is_mock: bool) -> None:
+        # ---- Root layout: left column (everything) + right column (motors grid) ----
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0, minsize=360)
+        self.grid_rowconfigure(0, weight=1)
+
+        left_panel = ctk.CTkFrame(self, fg_color="transparent")
+        left_panel.grid(row=0, column=0, sticky="nsew")
+
+        motor_panel = ctk.CTkFrame(
+            self, fg_color="#1f242b", border_width=2, border_color="#2a3038",
+            corner_radius=12, width=360,
+        )
+        motor_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 20), pady=(8, 14))
+        motor_panel.grid_propagate(False)
+        motor_panel.grid_columnconfigure(0, weight=1)
+        motor_panel.grid_rowconfigure(0, weight=1)
+
+        # ---- LEFT SIDE ----
         if is_mock:
             ctk.CTkLabel(
-                self,
+                left_panel,
                 text="MODO MOCK: SIN ARDUINO CONECTADO",
                 text_color="black",
                 fg_color="#ff9800",
-                font=("Roboto", 13, "bold"),
+                font=("Roboto", 15, "bold"),
+                height=34,
                 corner_radius=8,
-            ).pack(fill="x", padx=20, pady=(6, 0))
+            ).pack(fill="x", padx=20, pady=(8, 0))
 
         ctk.CTkLabel(
-            self,
+            left_panel,
             text="DEMO CONTROL DE POLÍTICAS HÁPTICAS",
-            font=("Roboto", 22, "bold"),
+            font=("Roboto", 26, "bold"),
             text_color="#00ADB5",
-        ).pack(pady=(7, 4))
+        ).pack(pady=(8, 4))
 
-        auto_frame = ctk.CTkFrame(self, fg_color="#2a3038", corner_radius=12)
-        auto_frame.pack(fill="x", padx=20, pady=3)
+        auto_frame = ctk.CTkFrame(left_panel, fg_color="#2a3038", corner_radius=12)
+        auto_frame.pack(fill="x", padx=20, pady=4)
         self.auto_var = tk.BooleanVar(value=False)
         ctk.CTkSwitch(
             auto_frame,
-            text=f"Modo Secuencia Automática ({DEMO_STEP_DURATION_SEC})",
+            text=f"Modo Secuencia Automática ({DEMO_STEP_DURATION_SEC}s)",
             variable=self.auto_var,
-            font=("Roboto", 15, "bold"),
+            font=("Roboto", 17, "bold"),
+            switch_width=48,
+            switch_height=24,
             text_color="#EEEEEE",
             progress_color="#00ADB5",
             command=self.toggle_auto_mode,
-        ).pack(side="left", padx=15, pady=8)
+        ).pack(side="left", padx=18, pady=10)
         self.timer_label = ctk.CTkLabel(
-            auto_frame, text="Timer: --s", font=("Roboto", 14, "bold"), text_color="#00ADB5"
+            auto_frame, text="Timer: --s", font=("Roboto", 17, "bold"), text_color="#00ADB5"
         )
-        self.timer_label.pack(side="right", padx=15)
-
-        button_frame = ctk.CTkFrame(
-            self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
-        )
-        button_frame.pack(fill="x", padx=20, pady=3)
-        button_container = ctk.CTkFrame(button_frame, fg_color="transparent")
-        button_container.pack(fill="x", padx=12, pady=5)
-
-        self.buttons: Dict[str, ctk.CTkButton] = {}
-        for policy in VALID_POLICIES:
-            button = ctk.CTkButton(
-                button_container,
-                text=POLICY_LABELS[policy],
-                font=("Roboto", 13, "bold"),
-                fg_color="#00ADB5",
-                hover_color="#008C92",
-                text_color="#FFFFFF",
-                corner_radius=8,
-                command=lambda selected=policy: self.select_policy_manual(selected),
-            )
-            button.pack(side="left", expand=True, fill="x", padx=6)
-            self.buttons[policy] = button
-        ctk.CTkButton(
-            button_container,
-            text="STOP",
-            font=("Roboto", 14, "bold"),
-            fg_color="#333333",
-            hover_color="#111111",
-            text_color="#ff4444",
-            corner_radius=8,
-            width=90,
-            command=self.stop_playback,
-        ).pack(side="right", padx=6)
-        ctk.CTkButton(
-            button_container,
-            text="VER IMÁGENES",
-            font=("Roboto", 13, "bold"),
-            fg_color="#00ADB5",
-            hover_color="#008C92",
-            text_color="#FFFFFF",
-            corner_radius=8,
-            command=self.open_policy_gallery,
-        ).pack(side="right", padx=6)
+        self.timer_label.pack(side="right", padx=18)
 
         telemetry_frame = ctk.CTkFrame(
-            self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
+            left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        telemetry_frame.pack(fill="x", padx=20, pady=3)
-        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 15))
-        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 15))
-        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 15))
+        telemetry_frame.pack(fill="x", padx=20, pady=4)
+        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 18, "bold"))
+        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"))
+        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"))
         for column, label in enumerate((self.lbl_bpm, self.lbl_smooth, self.lbl_delta)):
-            label.grid(row=0, column=column, padx=12, pady=2, sticky="ew")
+            label.grid(row=0, column=column, padx=12, pady=(6, 2), sticky="ew")
         telemetry_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
         ctk.CTkLabel(
             telemetry_frame,
             text="MONITOR DE PULSO",
-            font=("Roboto", 10, "bold"),
+            font=("Roboto", 13, "bold"),
             text_color="#00ADB5",
-        ).grid(row=2, column=0, columnspan=3, pady=(0, 0))
+        ).grid(row=1, column=0, columnspan=3, pady=(2, 2))
         self.ecg_canvas = tk.Canvas(
             telemetry_frame,
-            height=170,
+            height=160,
             bg="#10161b",
             highlightthickness=1,
             highlightbackground="#2a3038",
         )
-        self.ecg_canvas.grid(row=3, column=0, columnspan=3, padx=12, pady=(2, 5), sticky="ew")
-        telemetry_frame.grid_rowconfigure(3, weight=1)
+        self.ecg_canvas.grid(row=2, column=0, columnspan=3, padx=12, pady=(2, 8), sticky="ew")
+        telemetry_frame.grid_rowconfigure(2, weight=1)
 
-        self.image_frame = ctk.CTkFrame(
-            self, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
+        # ---- Buttons: policies in a 2x2 grid, STOP / VER IMÁGENES on the right ----
+        button_frame = ctk.CTkFrame(
+            left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        self.image_frame.pack(fill="both", expand=True, padx=20, pady=(3, 12))
-        button_frame.pack_forget()
-        button_frame.pack(fill="x", padx=20, pady=3, before=self.image_frame)
-        self.image_frame.grid_columnconfigure(0, weight=3)
-        self.image_frame.grid_columnconfigure(1, weight=2)
+        button_frame.pack(fill="x", padx=20, pady=4)
+        button_container = ctk.CTkFrame(button_frame, fg_color="transparent")
+        button_container.pack(fill="x", padx=12, pady=8)
+        button_container.grid_columnconfigure(0, weight=1)
+        button_container.grid_columnconfigure(1, weight=0)
+
+        policy_grid = ctk.CTkFrame(button_container, fg_color="transparent")
+        policy_grid.grid(row=0, column=0, sticky="nsew")
+        policy_grid.grid_columnconfigure((0, 1), weight=1, uniform="policy_col")
+
+        self.buttons: Dict[str, ctk.CTkButton] = {}
+        for index, policy in enumerate(VALID_POLICIES):
+            button = ctk.CTkButton(
+                policy_grid,
+                text=POLICY_LABELS[policy],
+                font=("Roboto", 15, "bold"),
+                height=46,
+                fg_color=POLICY_COLORS[policy],
+                hover_color=POLICY_COLORS[policy],
+                text_color="#FFFFFF",
+                corner_radius=8,
+                command=lambda selected=policy: self.select_policy_manual(selected),
+            )
+            button.grid(row=index // 2, column=index % 2, padx=5, pady=5, sticky="ew")
+            self.buttons[policy] = button
+
+        side_buttons = ctk.CTkFrame(button_container, fg_color="transparent")
+        side_buttons.grid(row=0, column=1, sticky="ns", padx=(5, 0))
+        side_buttons.grid_columnconfigure(0, weight=1)
+        side_buttons.grid_rowconfigure((0, 1), weight=1)
+        ctk.CTkButton(
+            side_buttons,
+            text="VER IMÁGENES",
+            font=("Roboto", 15, "bold"),
+            fg_color="#605F5E",
+            hover_color="#605F5E",
+            text_color="#FFFFFF",
+            corner_radius=8,
+            height=46,
+            command=self.open_policy_gallery,
+        ).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        ctk.CTkButton(
+            side_buttons,
+            text="STOP",
+            font=("Roboto", 15, "bold"),
+            fg_color="#333333",
+            hover_color="#111111",
+            text_color="#ff4444",
+            corner_radius=8,
+            height=46,
+            command=self.stop_playback,
+        ).grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+
+        # ---- Policy info (left) ----
+        self.image_frame = ctk.CTkFrame(
+            left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
+        )
+        self.image_frame.pack(fill="both", expand=True, padx=20, pady=(4, 14))
+        self.image_frame.grid_columnconfigure(0, weight=1)
         self.image_frame.grid_rowconfigure(0, weight=1)
+
+        # ---- RIGHT SIDE: motors grid, fills the full height ----
         self.motor_canvas = tk.Canvas(
-            self.image_frame,
+            motor_panel,
+            width=360,
             bg="#10161b",
             highlightthickness=1,
             highlightbackground="#2a3038",
         )
-        self.motor_canvas.grid(
-            row=0, column=0, rowspan=6,
-            padx=12, pady=12, sticky="nsew"
-        )
+        self.motor_canvas.grid(row=0, column=0, padx=14, pady=14, sticky="nsew")
         self.motor_canvas.bind("<Configure>", self._resize_policy_content)
+
         self.motor_info_frame = ctk.CTkFrame(self.image_frame, fg_color="transparent")
         self.motor_info_frame.grid(
-            row=0, column=1, padx=(4, 16), pady=(30, 0), sticky="n"
+            row=0, column=0, padx=(10, 18), pady=18, sticky="nsew"
         )
+        self.motor_info_frame.grid_columnconfigure(0, weight=1)
+        self.motor_info_frame.grid_rowconfigure(0, weight=0)
+        self.motor_info_frame.grid_rowconfigure(1, weight=1)
+
         self.motor_policy_label = ctk.CTkLabel(
             self.motor_info_frame,
             text="Política Activa:\nNINGUNA",
-            font=("Roboto", 16, "bold"),
+            font=("Roboto", 22, "bold"),
             text_color="#00ADB5",
             justify="center",
-            wraplength=270,
+            wraplength=300,
         )
-        self.motor_policy_label.pack(pady=(0, 8))
+        self.motor_policy_label.pack(pady=(10, 14), fill="x")
+
         self.motor_policy_description_label = ctk.CTkLabel(
             self.motor_info_frame,
             text="",
-            font=("Roboto", 20),
+            font=("Roboto", 22),
             text_color="#D2D8D6",
             anchor="center",
             justify="center",
-            wraplength=270,
-            width=270,
+            wraplength=300,
         )
-        self.motor_policy_description_label.pack()
+        self.motor_policy_description_label.pack(fill="both", expand=True, padx=10)
+
         self.scenario_level_label = ctk.CTkLabel(
             self.image_frame,
             text="SIN POLITICA ACTIVA",
-            font=("Roboto", 14, "bold"),
+            font=("Roboto", 16, "bold"),
             text_color="#00ADB5",
             anchor="w",
             justify="left",
         )
-        self.scenario_level_label.grid(row=0, column=1, padx=(8, 16), pady=(18, 2), sticky="ew")
+        self.scenario_level_label.grid(row=1, column=0, padx=(8, 16), pady=(18, 2), sticky="ew")
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
             text="Escenas cotidianas",
-            font=("Roboto", 27, "bold"),
+            font=("Roboto", 28, "bold"),
             text_color="#EEEEEE",
             anchor="w",
             justify="left",
             wraplength=320,
         )
-        self.scenario_title_label.grid(row=1, column=1, padx=(8, 16), pady=(0, 8), sticky="ew")
+        self.scenario_title_label.grid(row=2, column=0, padx=(8, 16), pady=(0, 8), sticky="ew")
         self.scenario_description_label = ctk.CTkLabel(
             self.image_frame,
             text="Selecciona una politica para ver una situacion posible asociada a ella.",
-            font=("Roboto", 18),
+            font=("Roboto", 20),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
             wraplength=320,
         )
-        self.scenario_description_label.grid(row=2, column=1, padx=(8, 16), pady=(0, 12), sticky="new")
+        self.scenario_description_label.grid(row=3, column=0, padx=(8, 16), pady=(0, 12), sticky="new")
         self.scenario_support_label = ctk.CTkLabel(
             self.image_frame,
             text="ACOMPAÑAMIENTO HAPTICO",
-            font=("Roboto", 14, "bold"),
+            font=("Roboto", 16, "bold"),
             text_color="#9FC7B7",
             anchor="w",
         )
-        self.scenario_support_label.grid(row=3, column=1, padx=(8, 16), pady=(4, 2), sticky="ew")
+        self.scenario_support_label.grid(row=4, column=0, padx=(8, 16), pady=(4, 2), sticky="ew")
         self.scenario_response_label = ctk.CTkLabel(
             self.image_frame,
             text="",
-            font=("Roboto", 18),
+            font=("Roboto", 20),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
             wraplength=320,
         )
-        self.scenario_response_label.grid(row=4, column=1, padx=(8, 16), pady=(0, 10), sticky="new")
+        self.scenario_response_label.grid(row=5, column=0, padx=(8, 16), pady=(0, 10), sticky="new")
         self.scenario_note_label = ctk.CTkLabel(
             self.image_frame,
             text="Ejemplos ilustrativos; cada persona vive los estimulos de manera distinta.",
-            font=("Roboto", 13, "italic"),
+            font=("Roboto", 15, "italic"),
             text_color="#899895",
             anchor="w",
             justify="left",
             wraplength=320,
         )
-        self.scenario_note_label.grid(row=5, column=1, padx=(8, 16), pady=(0, 16), sticky="ew")
+        self.scenario_note_label.grid(row=6, column=0, padx=(8, 16), pady=(0, 16), sticky="ew")
         for label in (
             self.scenario_level_label,
             self.scenario_title_label,
@@ -351,6 +392,27 @@ class HapticUIView:
             self.scenario_note_label,
         ):
             label.grid_remove()
+
+        # Keep the policy texts inside the panel: wrap them to the available width.
+        wrap_state = {"value": 300}
+
+        def _update_text_wrap(event) -> None:
+            wrap = max(150, event.width - 70)
+            if wrap == wrap_state["value"]:
+                return
+            wrap_state["value"] = wrap
+            for wrapped in (
+                self.motor_policy_label,
+                self.motor_policy_description_label,
+                self.scenario_title_label,
+                self.scenario_description_label,
+                self.scenario_response_label,
+                self.scenario_note_label,
+            ):
+                wrapped.configure(wraplength=wrap)
+
+        self.image_frame.bind("<Configure>", _update_text_wrap, add="+")
+
         self.displayed_policy: Optional[str] = None
         self.motor_active_motors: set[int] = set()
         self.motor_sequence_token = 0
@@ -358,7 +420,7 @@ class HapticUIView:
         self.policy_gallery_window: Optional[ctk.CTkToplevel] = None
         self.policy_gallery_images: list[ctk.CTkImage] = []
         self.update_displayed_image(None)
-        self.image_frame.bind("<Configure>", self._resize_policy_content)
+        self.image_frame.bind("<Configure>", self._resize_policy_content, add="+")
 
     def open_policy_gallery(self) -> None:
         if self.policy_gallery_window is not None and self.policy_gallery_window.winfo_exists():

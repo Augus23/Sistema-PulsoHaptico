@@ -38,6 +38,13 @@ POLICY_LABELS = {
     "calm_down": "CALMA",
 }
 
+POLICY_COLORS = {
+    "awareness": "#00ADB5",
+    "reassure": "#007CB5",
+    "breath": "#0054B5",
+    "calm_down": "#0027B5",
+}
+
 MOCK_ECG_POLICY_LEVELS = {
     "awareness": (8.0, "CONCIENCIA - NIVEL 1"),
     "reassure": (14.0, "CONTENCIÓN - NIVEL 2"),
