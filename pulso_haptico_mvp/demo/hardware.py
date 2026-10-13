@@ -9,10 +9,9 @@ except ImportError:  # pragma: no cover - solo para mock/demo sin hardware
     Serial = Any  # type: ignore[misc]
     list_ports = None
 
-from demo.config import POLICY_TO_CODE, BPM_CONFIG
+from demo.constants import POLICY_TO_CODE, BPM_CONFIG
 from demo.protocol import parse_telemetry_line, build_effective_pattern
 
-MOCK_BASELINE_BPM = 68
 
 
 def choose_port_interactively() -> Optional[str]:

@@ -10,14 +10,20 @@ import customtkinter as ctk
 import tkinter as tk
 from PIL import Image
 
-from demo.config import (
+from demo.config import EffectivePattern
+from demo.hardware import MockArduinoSerial, SerialWorkerThread
+from demo.protocol import build_effective_pattern, load_catalog
+from demo.constants import (
     DEMO_STEP_DURATION_SEC,
     SEQUENTIAL_POLICIES,
     BPM_CONFIG,
     VALID_POLICIES,
+    POLICY_LABELS,
+    POLICY_SCENARIOS,
+    MOCK_ECG_POLICY_LEVELS,
+    MOTOR_POLICY_DESCRIPTIONS,
 )
-from demo.hardware import MockArduinoSerial, SerialWorkerThread
-from demo.protocol import build_effective_pattern, load_catalog
+
 
 
 ctk.set_appearance_mode("dark")
@@ -128,46 +134,7 @@ class HapticUIView:
     Clase responsable exclusivamente de la inicialización, manipulación visual,
     imágenes, animaciones de canvas y actualización gráfica (CustomTkinter).
     """
-    POLICY_LABELS = {
-        "awareness": "CONCIENCIA",
-        "reassure": "CONTENCIÓN",
-        "breath": "RESPIRACIÓN",
-        "calm_down": "CALMA",
-    }
-    MOCK_ECG_POLICY_LEVELS = {
-        "awareness": (8.0, "CONCIENCIA - NIVEL 1"),
-        "reassure": (14.0, "CONTENCIÓN - NIVEL 2"),
-        "breath": (22.0, "RESPIRACIÓN - NIVEL 3"),
-        "calm_down": (31.0, "CALMA - NIVEL 4"),
-    }
-    POLICY_SCENARIOS = {
-        "awareness": (
-            "Un cambio de actividad",
-            "En una transicion cotidiana se acumulan ruido, movimiento o conversaciones. Puede ser un momento para notar las primeras señales de incomodidad.",
-            "Una señal suave acompana la atencion al pulso.",
-        ),
-        "reassure": (
-            "Un plan que cambia",
-            "Una modificacion inesperada de la rutina puede generar incertidumbre o tension.",
-            "Un ritmo predecible ofrece una referencia estable.",
-        ),
-        "breath": (
-            "Un entorno muy estimulante",
-            "En un lugar concurrido, el ruido y la actividad pueden hacer que la activacion siga subiendo.",
-            "El patron ritmico acompaña una pausa y una respiracion mas lenta.",
-        ),
-        "calm_down": (
-            "Necesidad de bajar estimulos",
-            "Tras acumularse varios estimulos, puede ayudar hacer una pausa o buscar un lugar mas tranquilo.",
-            "La secuencia acompaña la autorregulacion, respetando lo que le resulte comodo a la persona.",
-        ),
-    }
-    MOTOR_POLICY_DESCRIPTIONS = {
-        "awareness": "En medio de la rutina, cuando el ruido o el movimiento empiezan a generar una incomodidad leve, el dispositivo da un toque suave y rápido en el brazo, como un \"subrayado\" sutil para avisarte que tu cuerpo está empezando a notarlo, sin apurarte ni corregirte nada todavía.",
-        "reassure": "Frente a un cambio inesperado en la rutina o cuando hay incertidumbre, pero querés mantener la tranquilidad, el dispositivo da un toque muy suave y repartido en el brazo, como una presencia discreta que te confirma que todo está bien y te ayuda a mantener el equilibrio",
-        "breath": "En situaciones muy estimulantes o concurridas (como una exposición pública) donde la ansiedad empieza a subir, el dispositivo te acompaña con una vibración en forma de \"ola\" que sube, se mantiene un instante y baja suavemente, invitándote a regular el ritmo de tu respiración sin apurarte",
-        "calm_down": "Cuando se acumulan demasiados estímulos, el nivel de estrés es alto y el cuerpo necesita hacer una pausa o buscar un lugar más tranquilo, el dispositivo te abraza con una vibración amplia que empieza firme y se va apagando progresivamente, ayudándote a bajar la intensidad de forma segura y sin sobresaltos.",
-    }
+   
 
     def _build_ui(self, is_mock: bool) -> None:
         if is_mock:
@@ -215,7 +182,7 @@ class HapticUIView:
         for policy in VALID_POLICIES:
             button = ctk.CTkButton(
                 button_container,
-                text=self.POLICY_LABELS[policy],
+                text=POLICY_LABELS[policy],
                 font=("Roboto", 13, "bold"),
                 fg_color="#00ADB5",
                 hover_color="#008C92",
@@ -400,8 +367,8 @@ class HapticUIView:
 
         gallery = ctk.CTkToplevel(self)
         gallery.title("Imágenes de políticas")
-        gallery.geometry("1150x920")
-        gallery.minsize(980, 820)
+        gallery.geometry("1100x640")
+        gallery.minsize(480, 320)
         gallery.configure(fg_color="#1a1e24")
         self.policy_gallery_window = gallery
         self.policy_gallery_images = []
@@ -413,64 +380,89 @@ class HapticUIView:
             text_color="#00ADB5",
         ).pack(pady=(18, 12))
 
-        cards_frame = ctk.CTkFrame(gallery, fg_color="transparent")
-        cards_frame.pack(fill="both", expand=True, padx=22, pady=(0, 18))
-        cards_frame.grid_columnconfigure((0, 1), weight=1)
-        cards_frame.grid_rowconfigure((0, 1), weight=1)
+        grid_frame = ctk.CTkFrame(gallery, fg_color="#1a1e24")
+        grid_frame.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+        grid_frame.grid_rowconfigure((0, 1), weight=1)
+        grid_frame.grid_columnconfigure((0, 1), weight=1)
 
-        image_paths = {
+        # 2x2 grid: top (awareness, reassure), bottom (breath, calm_down)
+        policies_grid = [
+            ("awareness", 0, 0),
+            ("reassure", 0, 1),
+            ("breath", 1, 0),
+            ("calm_down", 1, 1),
+        ]
+
+        image_files = {
             "awareness": "static/awareness.jpg",
             "reassure": "static/reassure.jpg",
             "breath": "static/breath.jpg",
             "calm_down": "static/calm_down.jpg",
         }
-        for index, policy in enumerate(VALID_POLICIES):
-            card = ctk.CTkFrame(
-                cards_frame,
-                fg_color="#1f242b",
-                border_width=2,
-                border_color="#2a3038",
-                corner_radius=12,
-            )
-            card.grid(
-                row=index // 2,
-                column=index % 2,
-                padx=8,
-                pady=8,
-                sticky="nsew",
-            )
-            card.grid_columnconfigure(0, weight=1)
 
-            image_label = ctk.CTkLabel(card, text="Imagen no encontrada")
+        ctk_images: Dict[str, ctk.CTkImage] = {}
+        static_base = Path(__file__).resolve().parent
+        cell_pad = 10
+
+        for policy, row, col in policies_grid:
+            lbl = ctk.CTkLabel(grid_frame, text="", fg_color="transparent")
+            lbl.grid(row=row, column=col, padx=cell_pad, pady=cell_pad, sticky="nsew")
+
+            image_path = static_base / image_files[policy]
             try:
-                image = Image.open(Path(__file__).resolve().parent / image_paths[policy]).copy()
-                ctk_image = ctk.CTkImage(
-                    light_image=image,
-                    dark_image=image,
-                    size=(440, 248),
+                pil_img = Image.open(image_path).copy()
+                ctk_img = ctk.CTkImage(
+                    light_image=pil_img,
+                    dark_image=pil_img,
+                    size=(520, 290),
                 )
-                self.policy_gallery_images.append(ctk_image)
-                image_label.configure(image=ctk_image, text="")
+                self.policy_gallery_images.append(ctk_img)
+                ctk_images[policy] = ctk_img
+                lbl.configure(image=ctk_img)
             except (FileNotFoundError, OSError):
-                pass
-            image_label.pack(anchor="n", padx=12, pady=(12, 6))
+                lbl.configure(text=f"Imagen no encontrada\n({policy})")
 
-            _, description, _ = self.POLICY_SCENARIOS[policy]
-            ctk.CTkLabel(
-                card,
-                text=description,
-                font=("Roboto", 19),
-                text_color="#D2D8D6",
-                justify="left",
-                wraplength=410,
-            ).pack(fill="x", padx=14, pady=(4, 12))
+        last_dimensions = [0, 0]
+        resize_timer: list[Optional[str]] = [None]
+
+        def _update_image_sizes() -> None:
+            if not gallery.winfo_exists():
+                return
+            width = grid_frame.winfo_width()
+            height = grid_frame.winfo_height()
+            if width <= 10 or height <= 10:
+                width = max(100, gallery.winfo_width() - 32)
+                height = max(100, gallery.winfo_height() - 80)
+
+            # Account for padding on each cell
+            cell_w = max(20, (width - (cell_pad * 4)) // 2)
+            cell_h = max(20, (height - (cell_pad * 4)) // 2)
+
+            if (cell_w, cell_h) == (last_dimensions[0], last_dimensions[1]):
+                return
+            last_dimensions[0], last_dimensions[1] = cell_w, cell_h
+
+            for ctk_img in ctk_images.values():
+                ctk_img.configure(size=(cell_w, cell_h))
+
+        def _on_window_configure(event) -> None:
+            if event.widget != gallery:
+                return
+            if resize_timer[0] is not None:
+                gallery.after_cancel(resize_timer[0])
+            resize_timer[0] = gallery.after(15, _update_image_sizes)
+
+        gallery.bind("<Configure>", _on_window_configure)
 
         def close_gallery() -> None:
+            if resize_timer[0] is not None:
+                gallery.after_cancel(resize_timer[0])
             self.policy_gallery_window = None
             self.policy_gallery_images = []
             gallery.destroy()
 
         gallery.protocol("WM_DELETE_WINDOW", close_gallery)
+        gallery.after(30, _update_image_sizes)
 
     def _resize_policy_content(self, _event=None) -> None:
         panel_width = self.image_frame.winfo_width()
@@ -605,7 +597,7 @@ class HapticUIView:
     def update_displayed_image(self, policy: Optional[str]) -> None:
         self._cancel_motor_sequence()
         self.displayed_policy = policy
-        if policy not in self.POLICY_SCENARIOS:
+        if policy not in POLICY_SCENARIOS:
             self._draw_motor_map(None)
             self.motor_policy_description_label.configure(text="")
             self.scenario_level_label.configure(text="SIN POLITICA ACTIVA")
@@ -618,10 +610,10 @@ class HapticUIView:
             return
 
         self._draw_motor_map(policy)
-        title, description, response = self.POLICY_SCENARIOS[policy]
-        motor_description = self.MOTOR_POLICY_DESCRIPTIONS.get(policy, description)
+        title, description, response = POLICY_SCENARIOS[policy]
+        motor_description = MOTOR_POLICY_DESCRIPTIONS.get(policy, description)
         self.motor_policy_description_label.configure(text=motor_description)
-        _, level_label = self.MOCK_ECG_POLICY_LEVELS[policy]
+        _, level_label = MOCK_ECG_POLICY_LEVELS[policy]
         self.scenario_level_label.configure(text=level_label)
         self.scenario_title_label.configure(text=title)
         self.scenario_description_label.configure(text=description)
@@ -674,8 +666,8 @@ class HapticUIView:
             visible_seconds = 6.0
             now = time.time()
             if use_mock_visuals:
-                amplitude, policy_label = self.MOCK_ECG_POLICY_LEVELS.get(
-                    self.ecg_policy, self.MOCK_ECG_POLICY_LEVELS["reassure"]
+                amplitude, policy_label = MOCK_ECG_POLICY_LEVELS.get(
+                    self.ecg_policy, MOCK_ECG_POLICY_LEVELS["reassure"]
                 )
                 visual_exaggeration = {
                     "awareness": 1.2,
@@ -785,7 +777,7 @@ class HapticUIController:
         self.highlight_button(policy)
         self.worker.send_policy(policy)
         self.motor_policy_label.configure(
-            text=f"Política Activa:\n{self.POLICY_LABELS[policy]}"
+            text=f"Política Activa:\n{POLICY_LABELS[policy]}"
         )
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
@@ -836,7 +828,7 @@ class HapticUIController:
         self.worker.send_policy(policy)
         self.highlight_button(policy)
         self.motor_policy_label.configure(
-            text=f"Política Activa (AUTO):\n{self.POLICY_LABELS[policy]}"
+            text=f"Política Activa (AUTO):\n{POLICY_LABELS[policy]}"
         )
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
@@ -938,55 +930,55 @@ class HapticDemoApp(ctk.CTk, HapticUIView, HapticUIController):
         self._animate_ecg()
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Panel de control del pulso háptico (modo mock o hardware real).")
-    parser.add_argument("--mock", action="store_true", help="Ejecuta la UI con el simulador del Arduino")
-    parser.add_argument("--port", help="Puerto Serial real (ej. /dev/ttyUSB0 o COM5)")
-    parser.add_argument("--baud", type=int, default=115200, help="Velocidad del puerto serial")
-    parser.add_argument("--catalog", default="patterns", help="Carpeta con los patrones JSON")
-    args = parser.parse_args()
+# def main() -> int:
+#     parser = argparse.ArgumentParser(description="Panel de control del pulso háptico (modo mock o hardware real).")
+#     parser.add_argument("--mock", action="store_true", help="Ejecuta la UI con el simulador del Arduino")
+#     parser.add_argument("--port", help="Puerto Serial real (ej. /dev/ttyUSB0 o COM5)")
+#     parser.add_argument("--baud", type=int, default=115200, help="Velocidad del puerto serial")
+#     parser.add_argument("--catalog", default="patterns", help="Carpeta con los patrones JSON")
+#     args = parser.parse_args()
 
-    try:
-        catalog = load_catalog(Path(args.catalog))
-    except Exception as exc:
-        print(f"[ERROR] Falló la carga del catálogo: {exc}")
-        return 1
+#     try:
+#         catalog = load_catalog(Path(args.catalog))
+#     except Exception as exc:
+#         print(f"[ERROR] Falló la carga del catálogo: {exc}")
+#         return 1
 
-    if args.mock:
-        ser_instance = MockArduinoSerial()
-    else:
-        try:
-            import serial
-        except ImportError:
-            print("ERROR: falta instalar pyserial. Ejecutá: pip install pyserial", file=sys.stderr)
-            return 1
+#     if args.mock:
+#         ser_instance = MockArduinoSerial()
+#     else:
+#         try:
+#             import serial
+#         except ImportError:
+#             print("ERROR: falta instalar pyserial. Ejecutá: pip install pyserial", file=sys.stderr)
+#             return 1
 
-        if not args.port:
-            print("[ERROR] No se seleccionó puerto. Si no tienes hardware, usa --mock")
-            return 1
+#         if not args.port:
+#             print("[ERROR] No se seleccionó puerto. Si no tienes hardware, usa --mock")
+#             return 1
 
-        try:
-            ser_instance = serial.Serial(port=args.port, baudrate=args.baud, timeout=1.0)
-            time.sleep(2.0)
-            ser_instance.reset_input_buffer()
-        except serial.SerialException as exc:
-            print(f"[ERROR] No se pudo abrir puerto {args.port}: {exc}")
-            return 1
+#         try:
+#             ser_instance = serial.Serial(port=args.port, baudrate=args.baud, timeout=1.0)
+#             time.sleep(2.0)
+#             ser_instance.reset_input_buffer()
+#         except serial.SerialException as exc:
+#             print(f"[ERROR] No se pudo abrir puerto {args.port}: {exc}")
+#             return 1
 
-    worker = SerialWorkerThread(ser_instance, catalog)
-    worker.start()
-    app = HapticDemoApp(worker, is_mock=args.mock)
+#     worker = SerialWorkerThread(ser_instance, catalog)
+#     worker.start()
+#     app = HapticDemoApp(worker, is_mock=args.mock)
 
-    def on_closing() -> None:
-        if app.orchestrator:
-            app.orchestrator.stop_demo()
-        worker.stop()
-        app.destroy()
+#     def on_closing() -> None:
+#         if app.orchestrator:
+#             app.orchestrator.stop_demo()
+#         worker.stop()
+#         app.destroy()
 
-    app.protocol("WM_DELETE_WINDOW", on_closing)
-    app.mainloop()
-    return 0
+#     app.protocol("WM_DELETE_WINDOW", on_closing)
+#     app.mainloop()
+#     return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+# if __name__ == "__main__":
+#     sys.exit(main())

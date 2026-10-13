@@ -12,34 +12,3 @@ class EffectivePattern:
     commands: List[str]
     human_steps: List[Dict[str, Any]]
 
-
-
-# =============================================================================
-# CONSTANTES Y PROTOCOLO
-# =============================================================================
-POLICY_TO_CODE = {
-    "reassure": 1,
-    "awareness": 2,
-    "breath": 3,
-    "calm_down": 4,
-}
-
-TRANSITION_TO_CODE = {
-    "instant": 0,
-    "ramp_up": 1,
-    "hold": 2,
-    "ramp_down": 3,
-    "pause": 4,
-}
-
-# The automatic demo intentionally starts with awareness and then reassure.
-SEQUENTIAL_POLICIES = ["awareness", "reassure", "breath", "calm_down"]
-VALID_POLICIES = SEQUENTIAL_POLICIES.copy()
-DEMO_STEP_DURATION_SEC = 5.0
-
-BPM_CONFIG = {
-    "awareness": {"bpm": 68, "amplitude": 8},
-    "reassure": {"bpm": 82, "amplitude": 14},
-    "breath": {"bpm": 101, "amplitude": 24},
-    "calm_down": {"bpm": 124, "amplitude": 36},
-}
