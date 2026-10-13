@@ -198,11 +198,12 @@ class HapticUIView:
             left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
         telemetry_frame.pack(fill="x", padx=20, pady=4)
-        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 18, "bold"))
-        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"))
-        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"))
-        for column, label in enumerate((self.lbl_bpm, self.lbl_smooth, self.lbl_delta)):
-            label.grid(row=0, column=column, padx=12, pady=(6, 2), sticky="ew")
+        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 18, "bold"), anchor="w")
+        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"), anchor="center")
+        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"), anchor="e")
+        self.lbl_bpm.grid(row=0, column=0, padx=(14, 4), pady=(6, 2), sticky="ew")
+        self.lbl_smooth.grid(row=0, column=1, padx=4, pady=(6, 2), sticky="ew")
+        self.lbl_delta.grid(row=0, column=2, padx=(4, 14), pady=(6, 2), sticky="ew")
         telemetry_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
         ctk.CTkLabel(
