@@ -943,11 +943,11 @@ class HapticUIController:
                 return
             self.lbl_bpm.configure(text=f"BPM: {data.get('bpm', '--')}")
             if data.get("phase") == "run":
-                self.lbl_smooth.configure(text=f"Baseline: {data.get('baseline_bpm', '--')}")
+                self.lbl_smooth.configure(text=f"Pulso base: {data.get('baseline_bpm', '--')}")
                 self.lbl_delta.configure(text=f"Delta: {data.get('delta', '--')}")
             else:
-                self.lbl_smooth.configure(text=f"Beat average: {data.get('beat_avg', '--')}")
-                self.lbl_delta.configure(text=f"Samples: {data.get('baseline_samples', '--')}")
+                self.lbl_smooth.configure(text=f"Pulso promedio: {data.get('beat_avg', '--')}")
+                self.lbl_delta.configure(text=f"Muestras: {data.get('baseline_samples', '--')}")
 
             # Policy changes in auto mode are driven exclusively by the orchestrator
             # (via on_change_cb → _update_auto_ui). No reactive switch needed here.
