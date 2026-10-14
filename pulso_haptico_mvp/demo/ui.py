@@ -572,20 +572,12 @@ class HapticUIView:
         height = max(self.motor_canvas.winfo_height(), 260)
         self.motor_canvas.delete("motor")
         active_motors = self.motor_active_motors if policy else set()
-        self.motor_canvas.create_text(
-            width / 2,
-            24,
-            text="MAPA DE MOTORES",
-            fill="#00ADB5",
-            font=("Roboto", 13, "bold"),
-            tags="motor",
-        )
         radius = max(24, min(52, int(min(width, height) * 0.09)))
         frame_radius = max(12, min(24, int(min(width, height) * 0.04)))
         left = width * 0.30
         right = width * 0.70
         top = 62
-        bottom = height - 30
+        bottom = height - radius - 30
         self._create_rounded_rectangle(
             left - radius - 11,
             top - 20,
