@@ -422,6 +422,8 @@ class HapticUIView:
         self.motor_animation_after_id: Optional[str] = None
         self.policy_gallery_window: Optional[ctk.CTkToplevel] = None
         self.policy_gallery_images: list[ctk.CTkImage] = []
+        self.policy_gallery_title_label: Optional[ctk.CTkLabel] = None
+        self.policy_gallery_image_label: Optional[ctk.CTkLabel] = None
         self.update_displayed_image(None)
         self.image_frame.bind("<Configure>", self._resize_policy_content, add="+")
 
@@ -432,31 +434,19 @@ class HapticUIView:
 
         gallery = ctk.CTkToplevel(self)
         gallery.title("Imágenes de políticas")
-        gallery.geometry("1100x640")
-        gallery.minsize(480, 320)
+        gallery.geometry("1000x700")
+        gallery.minsize(480, 360)
         gallery.configure(fg_color="#1a1e24")
         self.policy_gallery_window = gallery
         self.policy_gallery_images = []
 
-        ctk.CTkLabel(
+        self.policy_gallery_title_label = ctk.CTkLabel(
             gallery,
-            text="Del reconocimiento sutil a la contención en estados de alta activación sensorial",
+            text="IMAGEN DE LA POLÍTICA SELECCIONADA",
             font=("Roboto", 22, "bold"),
             text_color="#00ADB5",
-        ).pack(pady=(18, 12))
-
-        grid_frame = ctk.CTkFrame(gallery, fg_color="#1a1e24")
-        grid_frame.pack(fill="both", expand=True, padx=16, pady=(0, 16))
-        grid_frame.grid_rowconfigure((0, 1), weight=1)
-        grid_frame.grid_columnconfigure((0, 1), weight=1)
-
-        # 2x2 grid: top (awareness, reassure), bottom (breath, calm_down)
-        policies_grid = [
-            ("awareness", 0, 0),
-            ("reassure", 0, 1),
-            ("breath", 1, 0),
-            ("calm_down", 1, 1),
-        ]
+        )
+        self.policy_gallery_title_label.pack(pady=(18, 12))
 
         image_files = {
             "awareness": "static/awareness.jpg",
@@ -465,69 +455,69 @@ class HapticUIView:
             "calm_down": "static/calm_down.jpg",
         }
 
-        ctk_images: Dict[str, ctk.CTkImage] = {}
         static_base = Path(__file__).resolve().parent
-        cell_pad = 10
-
-        for policy, row, col in policies_grid:
-            lbl = ctk.CTkLabel(grid_frame, text="", fg_color="transparent")
-            lbl.grid(row=row, column=col, padx=cell_pad, pady=cell_pad, sticky="nsew")
-
-            image_path = static_base / image_files[policy]
-            try:
-                pil_img = Image.open(image_path).copy()
-                ctk_img = ctk.CTkImage(
-                    light_image=pil_img,
-                    dark_image=pil_img,
-                    size=(520, 290),
-                )
-                self.policy_gallery_images.append(ctk_img)
-                ctk_images[policy] = ctk_img
-                lbl.configure(image=ctk_img)
-            except (FileNotFoundError, OSError):
-                lbl.configure(text=f"Imagen no encontrada\n({policy})")
-
-        last_dimensions = [0, 0]
-        resize_timer: list[Optional[str]] = [None]
-
-        def _update_image_sizes() -> None:
-            if not gallery.winfo_exists():
-                return
-            width = grid_frame.winfo_width()
-            height = grid_frame.winfo_height()
-            if width <= 10 or height <= 10:
-                width = max(100, gallery.winfo_width() - 32)
-                height = max(100, gallery.winfo_height() - 80)
-
-            # Account for padding on each cell
-            cell_w = max(20, (width - (cell_pad * 4)) // 2)
-            cell_h = max(20, (height - (cell_pad * 4)) // 2)
-
-            if (cell_w, cell_h) == (last_dimensions[0], last_dimensions[1]):
-                return
-            last_dimensions[0], last_dimensions[1] = cell_w, cell_h
-
-            for ctk_img in ctk_images.values():
-                ctk_img.configure(size=(cell_w, cell_h))
-
-        def _on_window_configure(event) -> None:
-            if event.widget != gallery:
-                return
-            if resize_timer[0] is not None:
-                gallery.after_cancel(resize_timer[0])
-            resize_timer[0] = gallery.after(15, _update_image_sizes)
-
-        gallery.bind("<Configure>", _on_window_configure)
+        self.policy_gallery_image_label = ctk.CTkLabel(
+            gallery, text="", fg_color="transparent"
+        )
+        self.policy_gallery_image_label.pack(
+            fill="both", expand=True, padx=24, pady=(0, 24)
+        )
+        self._update_policy_gallery_image(image_files, static_base)
 
         def close_gallery() -> None:
-            if resize_timer[0] is not None:
-                gallery.after_cancel(resize_timer[0])
             self.policy_gallery_window = None
             self.policy_gallery_images = []
+            self.policy_gallery_title_label = None
+            self.policy_gallery_image_label = None
             gallery.destroy()
 
         gallery.protocol("WM_DELETE_WINDOW", close_gallery)
-        gallery.after(30, _update_image_sizes)
+
+    def _update_policy_gallery_image(
+        self, image_files: Dict[str, str], static_base: Path
+    ) -> None:
+        if (
+            self.policy_gallery_window is None
+            or not self.policy_gallery_window.winfo_exists()
+            or self.policy_gallery_title_label is None
+            or self.policy_gallery_image_label is None
+        ):
+            return
+
+        policy = self.displayed_policy
+        image_label = self.policy_gallery_image_label
+        if policy not in image_files:
+            self.policy_gallery_title_label.configure(
+                text="SELECCIONA UNA POLÍTICA PARA VER SU IMAGEN"
+            )
+            image_label.configure(
+                image=None,
+                text="No hay una política seleccionada",
+                font=("Roboto", 18, "italic"),
+                text_color="#899895",
+            )
+            return
+
+        image_path = static_base / image_files[policy]
+        self.policy_gallery_title_label.configure(
+            text=f"POLÍTICA: {POLICY_LABELS[policy]}"
+        )
+        try:
+            pil_img = Image.open(image_path).copy()
+            ctk_img = ctk.CTkImage(
+                light_image=pil_img,
+                dark_image=pil_img,
+                size=(900, 560),
+            )
+            self.policy_gallery_images.append(ctk_img)
+            image_label.configure(image=ctk_img, text="")
+        except (FileNotFoundError, OSError):
+            image_label.configure(
+                image=None,
+                text=f"Imagen no encontrada\n({image_path.name})",
+                font=("Roboto", 18, "italic"),
+                text_color="#899895",
+            )
 
     def _resize_policy_content(self, _event=None) -> None:
         panel_width = self.image_frame.winfo_width()
@@ -536,6 +526,46 @@ class HapticUIView:
             return
 
         self._draw_motor_map(self.displayed_policy)
+
+    def _create_rounded_rectangle(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        radius: float,
+        **kwargs,
+    ) -> None:
+        radius = min(radius, (x2 - x1) / 2, (y2 - y1) / 2)
+        outline = kwargs.pop("outline", "")
+        self.motor_canvas.create_arc(
+            x1, y1, x1 + 2 * radius, y1 + 2 * radius,
+            start=90, extent=90, style="arc", outline=outline, **kwargs
+        )
+        self.motor_canvas.create_arc(
+            x2 - 2 * radius, y1, x2, y1 + 2 * radius,
+            start=0, extent=90, style="arc", outline=outline, **kwargs
+        )
+        self.motor_canvas.create_arc(
+            x2 - 2 * radius, y2 - 2 * radius, x2, y2,
+            start=270, extent=90, style="arc", outline=outline, **kwargs
+        )
+        self.motor_canvas.create_arc(
+            x1, y2 - 2 * radius, x1 + 2 * radius, y2,
+            start=180, extent=90, style="arc", outline=outline, **kwargs
+        )
+        self.motor_canvas.create_line(
+            x1 + radius, y1, x2 - radius, y1, fill=outline, **kwargs
+        )
+        self.motor_canvas.create_line(
+            x2, y1 + radius, x2, y2 - radius, fill=outline, **kwargs
+        )
+        self.motor_canvas.create_line(
+            x2 - radius, y2, x1 + radius, y2, fill=outline, **kwargs
+        )
+        self.motor_canvas.create_line(
+            x1, y2 - radius, x1, y1 + radius, fill=outline, **kwargs
+        )
 
     def _draw_motor_map(self, policy: Optional[str]) -> None:
         width = max(self.motor_canvas.winfo_width(), 360)
@@ -550,18 +580,19 @@ class HapticUIView:
             font=("Roboto", 13, "bold"),
             tags="motor",
         )
-        radius = max(18, min(40, int(min(width, height) * 0.07)))
+        radius = max(24, min(52, int(min(width, height) * 0.09)))
+        frame_radius = max(12, min(24, int(min(width, height) * 0.04)))
         left = width * 0.30
         right = width * 0.70
         top = 62
         bottom = height - 30
-        self.motor_canvas.create_rectangle(
+        self._create_rounded_rectangle(
             left - radius - 11,
             top - 20,
             right + radius + 11,
             bottom + 20,
-            outline="#607177",
-            width=2,
+            frame_radius,
+            outline="#607177", width=2,
             tags="motor",
         )
         positions = [
@@ -662,6 +693,15 @@ class HapticUIView:
     def update_displayed_image(self, policy: Optional[str]) -> None:
         self._cancel_motor_sequence()
         self.displayed_policy = policy
+        self._update_policy_gallery_image(
+            {
+                "awareness": "static/awareness.jpg",
+                "reassure": "static/reassure.jpg",
+                "breath": "static/breath.jpg",
+                "calm_down": "static/calm_down.jpg",
+            },
+            Path(__file__).resolve().parent,
+        )
         if policy not in POLICY_SCENARIOS:
             self._draw_motor_map(None)
             self.motor_policy_description_label.configure(text="")
