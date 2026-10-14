@@ -311,7 +311,7 @@ class HapticUIView:
         self.motor_policy_label = ctk.CTkLabel(
             self.motor_info_frame,
             text="Política Activa:\nNINGUNA",
-            font=("Roboto", 22, "bold"),
+            font=("Roboto", 18, "bold"),
             text_color="#00ADB5",
             justify="center",
             wraplength=300,
@@ -321,13 +321,15 @@ class HapticUIView:
         self.motor_policy_description_label = ctk.CTkLabel(
             self.motor_info_frame,
             text="",
-            font=("Roboto", 22),
+            font=("Roboto", 16),
             text_color="#D2D8D6",
             anchor="center",
             justify="center",
             wraplength=300,
         )
         self.motor_policy_description_label.pack(fill="both", expand=True, padx=10)
+        self.motor_policy_label.pack_forget()
+        self.motor_policy_description_label.pack_forget()
 
         self.scenario_level_label = ctk.CTkLabel(
             self.image_frame,
@@ -341,7 +343,7 @@ class HapticUIView:
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
             text="Escenas cotidianas",
-            font=("Roboto", 28, "bold"),
+            font=("Roboto", 22, "bold"),
             text_color="#EEEEEE",
             anchor="w",
             justify="left",
@@ -351,7 +353,7 @@ class HapticUIView:
         self.scenario_description_label = ctk.CTkLabel(
             self.image_frame,
             text="Selecciona una politica para ver una situacion posible asociada a ella.",
-            font=("Roboto", 20),
+            font=("Roboto", 16),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
@@ -369,7 +371,7 @@ class HapticUIView:
         self.scenario_response_label = ctk.CTkLabel(
             self.image_frame,
             text="",
-            font=("Roboto", 20),
+            font=("Roboto", 16),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
@@ -379,7 +381,7 @@ class HapticUIView:
         self.scenario_note_label = ctk.CTkLabel(
             self.image_frame,
             text="Ejemplos ilustrativos; cada persona vive los estimulos de manera distinta.",
-            font=("Roboto", 15, "italic"),
+            font=("Roboto", 13, "italic"),
             text_color="#899895",
             anchor="w",
             justify="left",
@@ -704,18 +706,35 @@ class HapticUIView:
             )
             self.scenario_support_label.configure(text="ACOMPANAMIENTO HAPTICO")
             self.scenario_response_label.configure(text="")
+            for label in (
+                self.scenario_level_label,
+                self.scenario_title_label,
+                self.scenario_description_label,
+                self.scenario_support_label,
+                self.scenario_response_label,
+                self.scenario_note_label,
+            ):
+                label.grid_remove()
             return
 
         self._draw_motor_map(policy)
-        title, description, response = POLICY_SCENARIOS[policy]
+        scenario = POLICY_SCENARIOS[policy]
+        if isinstance(scenario, (tuple, list)) and len(scenario) == 3:
+            title, description, _ = scenario
+        else:
+            title = POLICY_LABELS[policy]
+            description = scenario
         motor_description = MOTOR_POLICY_DESCRIPTIONS.get(policy, description)
+        description = description.replace(" Propuesta:", "\nPropuesta:")
         self.motor_policy_description_label.configure(text=motor_description)
-        _, level_label = MOCK_ECG_POLICY_LEVELS[policy]
-        self.scenario_level_label.configure(text=level_label)
         self.scenario_title_label.configure(text=title)
         self.scenario_description_label.configure(text=description)
-        self.scenario_support_label.configure(text="ACOMPANAMIENTO HAPTICO")
-        self.scenario_response_label.configure(text=response)
+        self.scenario_support_label.grid_remove()
+        self.scenario_response_label.configure(text="")
+        self.scenario_response_label.grid_remove()
+        for label in (self.scenario_title_label, self.scenario_description_label):
+            label.grid()
+        self.scenario_note_label.grid_remove()
         self._resize_policy_content()
 
     def highlight_button(self, policy: str) -> None:
@@ -874,7 +893,7 @@ class HapticUIController:
         self.highlight_button(policy)
         self.worker.send_policy(policy)
         self.motor_policy_label.configure(
-            text=f"Política Activa:\n{POLICY_LABELS[policy]}"
+            text=POLICY_LABELS[policy]
         )
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
@@ -925,7 +944,7 @@ class HapticUIController:
         self.worker.send_policy(policy)
         self.highlight_button(policy)
         self.motor_policy_label.configure(
-            text=f"Política Activa (AUTO):\n{POLICY_LABELS[policy]}"
+            text=POLICY_LABELS[policy]
         )
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
