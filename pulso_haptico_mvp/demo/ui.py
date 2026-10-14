@@ -292,7 +292,7 @@ class HapticUIView:
         button_frame.pack_forget()
         self.image_frame.pack_forget()
         self.image_frame.pack(fill="x", expand=False, padx=20, pady=(4, 6))
-        button_frame.pack(fill="x", padx=20, pady=(18, 14))
+        button_frame.pack(fill="x", padx=20, pady=(20, 16))
 
         # ---- RIGHT SIDE: motors grid, fills the full height ----
         self.motor_canvas = tk.Canvas(
@@ -782,7 +782,11 @@ class HapticUIView:
         height = max(self.ecg_canvas.winfo_height(), 125)
         middle = height / 2
         self.ecg_canvas.delete("wave")
-        use_mock_visuals = self.is_mock or self.auto_var.get() or self.ecg_policy is not None
+        use_mock_visuals = (
+            self.is_mock
+            or self.auto_var.get()
+            or (self.ecg_policy is not None and not self.ecg_signal_ok)
+        )
 
         if self.sequential_simulation:
             elapsed = time.monotonic() - self.ecg_transition_started_at
@@ -794,7 +798,7 @@ class HapticUIView:
                 self.ecg_target_amplitude - self.ecg_transition_from_amplitude
             ) * progress
 
-        if not self.ecg_signal_ok or (use_mock_visuals and self.ecg_policy is None):
+        if not self.ecg_signal_ok and self.ecg_policy is None:
             waiting_text = (
                 "Sin pulso - selecciona una política"
                 if use_mock_visuals and self.ecg_policy is None
