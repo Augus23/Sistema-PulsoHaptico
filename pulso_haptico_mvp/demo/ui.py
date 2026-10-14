@@ -292,7 +292,7 @@ class HapticUIView:
         button_frame.pack_forget()
         self.image_frame.pack_forget()
         self.image_frame.pack(fill="x", expand=False, padx=20, pady=(4, 6))
-        button_frame.pack(fill="x", padx=20, pady=(0, 8))
+        button_frame.pack(fill="x", padx=20, pady=(6, 8))
 
         # ---- RIGHT SIDE: motors grid, fills the full height ----
         self.motor_canvas = tk.Canvas(
@@ -355,7 +355,7 @@ class HapticUIView:
             justify="center",
             wraplength=320,
         )
-        self.scenario_title_label.grid(row=1, column=0, padx=(8, 16), pady=(0, 8), sticky="ew")
+        self.scenario_title_label.grid(row=1, column=0, padx=(8, 16), pady=(6, 8), sticky="ew")
         self.scenario_activation_heading_label = ctk.CTkLabel(
             self.image_frame,
             text="ACTIVACIÓN",
