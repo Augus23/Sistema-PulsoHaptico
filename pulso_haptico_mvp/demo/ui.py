@@ -286,9 +286,13 @@ class HapticUIView:
         self.image_frame = ctk.CTkFrame(
             left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        self.image_frame.pack(fill="both", expand=True, padx=20, pady=(4, 14))
+        self.image_frame.pack(fill="x", expand=False, padx=20, pady=(4, 6))
         self.image_frame.grid_columnconfigure(0, weight=1)
-        self.image_frame.grid_rowconfigure(0, weight=1)
+        self.image_frame.grid_rowconfigure(0, weight=0)
+        button_frame.pack_forget()
+        self.image_frame.pack_forget()
+        self.image_frame.pack(fill="x", expand=False, padx=20, pady=(4, 6))
+        button_frame.pack(fill="x", padx=20, pady=(0, 8))
 
         # ---- RIGHT SIDE: motors grid, fills the full height ----
         self.motor_canvas = tk.Canvas(
@@ -331,6 +335,7 @@ class HapticUIView:
         self.motor_policy_description_label.pack(fill="both", expand=True, padx=10)
         self.motor_policy_label.pack_forget()
         self.motor_policy_description_label.pack_forget()
+        self.motor_info_frame.grid_remove()
 
         self.scenario_level_label = ctk.CTkLabel(
             self.image_frame,
@@ -340,7 +345,7 @@ class HapticUIView:
             anchor="w",
             justify="left",
         )
-        self.scenario_level_label.grid(row=1, column=0, padx=(8, 16), pady=(18, 2), sticky="ew")
+        self.scenario_level_label.grid(row=0, column=0, padx=(8, 16), pady=(2, 0), sticky="ew")
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
             text="Escenas cotidianas",
@@ -350,7 +355,7 @@ class HapticUIView:
             justify="center",
             wraplength=320,
         )
-        self.scenario_title_label.grid(row=2, column=0, padx=(8, 16), pady=(0, 14), sticky="ew")
+        self.scenario_title_label.grid(row=1, column=0, padx=(8, 16), pady=(0, 8), sticky="ew")
         self.scenario_activation_heading_label = ctk.CTkLabel(
             self.image_frame,
             text="ACTIVACIÓN",
@@ -360,7 +365,7 @@ class HapticUIView:
             justify="left",
         )
         self.scenario_activation_heading_label.grid(
-            row=3, column=0, padx=(8, 16), pady=(0, 2), sticky="ew"
+            row=2, column=0, padx=(8, 16), pady=(0, 2), sticky="ew"
         )
         self.scenario_description_label = ctk.CTkLabel(
             self.image_frame,
@@ -372,7 +377,7 @@ class HapticUIView:
             wraplength=320,
         )
         self.scenario_description_label.grid(
-            row=4, column=0, padx=(8, 16), pady=(0, 14), sticky="new"
+            row=3, column=0, padx=(8, 16), pady=(0, 8), sticky="new"
         )
         self.scenario_support_label = ctk.CTkLabel(
             self.image_frame,
@@ -383,7 +388,7 @@ class HapticUIView:
             justify="left",
         )
         self.scenario_support_label.grid(
-            row=5, column=0, padx=(8, 16), pady=(0, 2), sticky="ew"
+            row=4, column=0, padx=(8, 16), pady=(0, 2), sticky="ew"
         )
         self.scenario_response_label = ctk.CTkLabel(
             self.image_frame,
@@ -395,7 +400,7 @@ class HapticUIView:
             wraplength=320,
         )
         self.scenario_response_label.grid(
-            row=6, column=0, padx=(8, 16), pady=(0, 10), sticky="new"
+            row=5, column=0, padx=(8, 16), pady=(0, 6), sticky="new"
         )
         self.scenario_note_label = ctk.CTkLabel(
             self.image_frame,
@@ -406,7 +411,7 @@ class HapticUIView:
             justify="left",
             wraplength=320,
         )
-        self.scenario_note_label.grid(row=6, column=0, padx=(8, 16), pady=(0, 16), sticky="ew")
+        self.scenario_note_label.grid(row=6, column=0, padx=(8, 16), pady=(0, 4), sticky="ew")
         for label in (
             self.scenario_level_label,
             self.scenario_title_label,
