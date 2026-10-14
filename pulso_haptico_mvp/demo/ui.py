@@ -239,14 +239,15 @@ class HapticUIView:
         policy_grid.grid_columnconfigure((0, 1), weight=1, uniform="policy_col")
 
         self.buttons: Dict[str, ctk.CTkButton] = {}
+        policy_button_color = POLICY_COLORS["reassure"]
         for index, policy in enumerate(VALID_POLICIES):
             button = ctk.CTkButton(
                 policy_grid,
                 text=POLICY_LABELS[policy],
                 font=("Roboto", 15, "bold"),
                 height=46,
-                fg_color=POLICY_COLORS[policy],
-                hover_color=POLICY_COLORS[policy],
+                fg_color=policy_button_color,
+                hover_color=policy_button_color,
                 text_color="#FFFFFF",
                 corner_radius=8,
                 command=lambda selected=policy: self.select_policy_manual(selected),
@@ -343,41 +344,59 @@ class HapticUIView:
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
             text="Escenas cotidianas",
-            font=("Roboto", 22, "bold"),
+            font=("Roboto", 24, "bold"),
             text_color="#EEEEEE",
-            anchor="w",
-            justify="left",
+            anchor="center",
+            justify="center",
             wraplength=320,
         )
-        self.scenario_title_label.grid(row=2, column=0, padx=(8, 16), pady=(0, 8), sticky="ew")
+        self.scenario_title_label.grid(row=2, column=0, padx=(8, 16), pady=(0, 14), sticky="ew")
+        self.scenario_activation_heading_label = ctk.CTkLabel(
+            self.image_frame,
+            text="ACTIVACIÓN",
+            font=("Roboto", 18, "bold"),
+            text_color="#00ADB5",
+            anchor="w",
+            justify="left",
+        )
+        self.scenario_activation_heading_label.grid(
+            row=3, column=0, padx=(8, 16), pady=(0, 2), sticky="ew"
+        )
         self.scenario_description_label = ctk.CTkLabel(
             self.image_frame,
             text="Selecciona una politica para ver una situacion posible asociada a ella.",
-            font=("Roboto", 16),
+            font=("Roboto", 19),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
             wraplength=320,
         )
-        self.scenario_description_label.grid(row=3, column=0, padx=(8, 16), pady=(0, 12), sticky="new")
+        self.scenario_description_label.grid(
+            row=4, column=0, padx=(8, 16), pady=(0, 14), sticky="new"
+        )
         self.scenario_support_label = ctk.CTkLabel(
             self.image_frame,
-            text="ACOMPAÑAMIENTO HAPTICO",
-            font=("Roboto", 16, "bold"),
-            text_color="#9FC7B7",
+            text="PROPUESTA",
+            font=("Roboto", 18, "bold"),
+            text_color="#00ADB5",
             anchor="w",
+            justify="left",
         )
-        self.scenario_support_label.grid(row=4, column=0, padx=(8, 16), pady=(4, 2), sticky="ew")
+        self.scenario_support_label.grid(
+            row=5, column=0, padx=(8, 16), pady=(0, 2), sticky="ew"
+        )
         self.scenario_response_label = ctk.CTkLabel(
             self.image_frame,
             text="",
-            font=("Roboto", 16),
+            font=("Roboto", 19),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
             wraplength=320,
         )
-        self.scenario_response_label.grid(row=5, column=0, padx=(8, 16), pady=(0, 10), sticky="new")
+        self.scenario_response_label.grid(
+            row=6, column=0, padx=(8, 16), pady=(0, 10), sticky="new"
+        )
         self.scenario_note_label = ctk.CTkLabel(
             self.image_frame,
             text="Ejemplos ilustrativos; cada persona vive los estimulos de manera distinta.",
@@ -391,6 +410,7 @@ class HapticUIView:
         for label in (
             self.scenario_level_label,
             self.scenario_title_label,
+            self.scenario_activation_heading_label,
             self.scenario_description_label,
             self.scenario_support_label,
             self.scenario_response_label,
@@ -410,6 +430,7 @@ class HapticUIView:
                 self.motor_policy_label,
                 self.motor_policy_description_label,
                 self.scenario_title_label,
+                self.scenario_activation_heading_label,
                 self.scenario_description_label,
                 self.scenario_response_label,
                 self.scenario_note_label,
@@ -709,6 +730,7 @@ class HapticUIView:
             for label in (
                 self.scenario_level_label,
                 self.scenario_title_label,
+                self.scenario_activation_heading_label,
                 self.scenario_description_label,
                 self.scenario_support_label,
                 self.scenario_response_label,
@@ -724,15 +746,24 @@ class HapticUIView:
         else:
             title = POLICY_LABELS[policy]
             description = scenario
-        motor_description = MOTOR_POLICY_DESCRIPTIONS.get(policy, description)
-        description = description.replace(" Propuesta:", "\nPropuesta:")
-        self.motor_policy_description_label.configure(text=motor_description)
+        if " Propuesta:" in description:
+            activation_text, proposal_text = description.split(" Propuesta:", 1)
+        else:
+            activation_text = description
+            proposal_text = ""
         self.scenario_title_label.configure(text=title)
-        self.scenario_description_label.configure(text=description)
-        self.scenario_support_label.grid_remove()
-        self.scenario_response_label.configure(text="")
-        self.scenario_response_label.grid_remove()
-        for label in (self.scenario_title_label, self.scenario_description_label):
+        self.scenario_description_label.configure(
+            text=activation_text.removeprefix("Activación:").strip()
+        )
+        self.scenario_support_label.configure(text="PROPUESTA")
+        self.scenario_response_label.configure(text=proposal_text.strip())
+        for label in (
+            self.scenario_title_label,
+            self.scenario_activation_heading_label,
+            self.scenario_description_label,
+            self.scenario_support_label,
+            self.scenario_response_label,
+        ):
             label.grid()
         self.scenario_note_label.grid_remove()
         self._resize_policy_content()
