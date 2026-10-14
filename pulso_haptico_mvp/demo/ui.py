@@ -452,6 +452,7 @@ class HapticUIView:
         self.motor_animation_after_id: Optional[str] = None
         self.policy_gallery_window: Optional[ctk.CTkToplevel] = None
         self.policy_gallery_images: list[ctk.CTkImage] = []
+        self.policy_gallery_current_image: Optional[ctk.CTkImage] = None
         self.policy_gallery_title_label: Optional[ctk.CTkLabel] = None
         self.policy_gallery_image_label: Optional[ctk.CTkLabel] = None
         self.update_displayed_image(None)
@@ -497,6 +498,7 @@ class HapticUIView:
         def close_gallery() -> None:
             self.policy_gallery_window = None
             self.policy_gallery_images = []
+            self.policy_gallery_current_image = None
             self.policy_gallery_title_label = None
             self.policy_gallery_image_label = None
             gallery.destroy()
@@ -521,6 +523,7 @@ class HapticUIView:
                 text="SELECCIONE UNA POLÍTICA"
             )
             self.policy_gallery_images = []
+            self.policy_gallery_current_image = None
             image_label.configure(
                 image=None,
                 compound="none",
@@ -541,8 +544,9 @@ class HapticUIView:
                 dark_image=pil_img,
                 size=(900, 560),
             )
+            self.policy_gallery_current_image = ctk_img
             self.policy_gallery_images.append(ctk_img)
-            image_label.configure(image=ctk_img, text="")
+            image_label.configure(image=ctk_img, compound="center", text="")
         except (FileNotFoundError, OSError):
             image_label.configure(
                 image=None,
