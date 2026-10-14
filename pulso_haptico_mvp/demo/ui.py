@@ -204,7 +204,9 @@ class HapticUIView:
         self.lbl_bpm.grid(row=0, column=0, padx=(14, 4), pady=(6, 2), sticky="ew")
         self.lbl_smooth.grid(row=0, column=1, padx=4, pady=(6, 2), sticky="ew")
         self.lbl_delta.grid(row=0, column=2, padx=(4, 14), pady=(6, 2), sticky="ew")
-        telemetry_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        # uniform="telemetry" fuerza columnas de igual ancho, así la columna central
+        # queda exactamente en el centro del frame (alineada con "MONITOR DE PULSO").
+        telemetry_frame.grid_columnconfigure((0, 1, 2), weight=1, uniform="telemetry")
 
         ctk.CTkLabel(
             telemetry_frame,
