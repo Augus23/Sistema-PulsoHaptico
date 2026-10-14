@@ -286,15 +286,15 @@ class HapticUIView:
         self.image_frame = ctk.CTkFrame(
             left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        self.image_frame.configure(height=270)
-        self.image_frame.pack(fill="x", expand=False, padx=20, pady=(4, 6))
+        self.image_frame.configure(height=220)
+        self.image_frame.pack(fill="x", expand=False, padx=20, pady=(2, 2))
         self.image_frame.grid_propagate(False)
         self.image_frame.grid_columnconfigure(0, weight=1)
         self.image_frame.grid_rowconfigure(0, weight=0)
         button_frame.pack_forget()
         self.image_frame.pack_forget()
-        self.image_frame.pack(fill="x", expand=False, padx=20, pady=(4, 6))
-        button_frame.pack(fill="x", padx=20, pady=(20, 16))
+        self.image_frame.pack(fill="x", expand=False, padx=20, pady=(2, 2))
+        button_frame.pack(fill="x", padx=20, pady=(6, 8))
 
         # ---- RIGHT SIDE: motors grid, fills the full height ----
         self.motor_canvas = tk.Canvas(
