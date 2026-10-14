@@ -54,15 +54,16 @@ MOCK_ECG_POLICY_LEVELS = {
 
 POLICY_SCENARIOS = {
     "awareness": (
-
+        "Activación: incremento leve de la frecuencia cardíaca. Propuesta: señal suave que permite tomar una pausa y llevar la atención al cuerpo."
     ),
     "reassure": (
-        
+        "Activación: fluctuaciones contínuas de la frecuencia cardíaca. Propuesta: toque suave y contínuo que proporciona estabilidad y compañía"
     ),
     "breath": (
-
+        "Activación: ritmo cardíaco moderado. Propuesta: marca compás pausado que acompaña al ritmo de la respiración"
     ),
     "calm_down": (
+        "Activación: incremento considerable del pulso cardíaco. Propuesta: emisión de patrón suave para reducir sobreestimulación"
     ),
 }
 MOTOR_POLICY_DESCRIPTIONS = {
