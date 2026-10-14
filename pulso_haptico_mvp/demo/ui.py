@@ -524,6 +524,7 @@ class HapticUIView:
             )
             self.policy_gallery_images = []
             self.policy_gallery_current_image = None
+            image_label.image = None
             image_label.configure(
                 image=None,
                 compound="none",
@@ -546,6 +547,7 @@ class HapticUIView:
             )
             self.policy_gallery_current_image = ctk_img
             self.policy_gallery_images.append(ctk_img)
+            image_label.image = ctk_img
             image_label.configure(image=ctk_img, compound="center", text="")
         except (FileNotFoundError, OSError):
             image_label.configure(
