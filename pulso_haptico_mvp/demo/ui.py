@@ -728,15 +728,12 @@ class HapticUIView:
             self._draw_motor_map(None)
             self.motor_policy_description_label.configure(text="")
             self.scenario_level_label.configure(text="SIN POLITICA ACTIVA")
-            self.scenario_title_label.configure(text="Escenas cotidianas")
-            self.scenario_description_label.configure(
-                text="Selecciona una politica para ver una situacion posible asociada a ella."
-            )
+            self.scenario_title_label.configure(text="Seleccione una política")
+            self.scenario_description_label.configure(text="")
             self.scenario_support_label.configure(text="ACOMPANAMIENTO HAPTICO")
             self.scenario_response_label.configure(text="")
             for label in (
                 self.scenario_level_label,
-                self.scenario_title_label,
                 self.scenario_activation_heading_label,
                 self.scenario_description_label,
                 self.scenario_support_label,
@@ -744,6 +741,7 @@ class HapticUIView:
                 self.scenario_note_label,
             ):
                 label.grid_remove()
+            self.scenario_title_label.grid()
             return
 
         self._draw_motor_map(policy)
