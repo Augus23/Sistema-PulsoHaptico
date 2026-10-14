@@ -292,7 +292,7 @@ class HapticUIView:
         button_frame.pack_forget()
         self.image_frame.pack_forget()
         self.image_frame.pack(fill="x", expand=False, padx=20, pady=(4, 6))
-        button_frame.pack(fill="x", padx=20, pady=(6, 8))
+        button_frame.pack(fill="x", padx=20, pady=(18, 14))
 
         # ---- RIGHT SIDE: motors grid, fills the full height ----
         self.motor_canvas = tk.Canvas(
