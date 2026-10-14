@@ -518,11 +518,13 @@ class HapticUIView:
         image_label = self.policy_gallery_image_label
         if policy not in image_files:
             self.policy_gallery_title_label.configure(
-                text="SELECCIONA UNA POLÍTICA PARA VER SU IMAGEN"
+                text="SELECCIONE UNA POLÍTICA"
             )
+            self.policy_gallery_images = []
             image_label.configure(
                 image=None,
-                text="No hay una política seleccionada",
+                compound="none",
+                text="Seleccione una política",
                 font=("Roboto", 18, "italic"),
                 text_color="#899895",
             )
