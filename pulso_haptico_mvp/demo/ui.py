@@ -246,9 +246,11 @@ class HapticUIView:
                 text=POLICY_LABELS[policy],
                 font=("Roboto", 15, "bold"),
                 height=46,
-                fg_color=policy_button_color,
-                hover_color=policy_button_color,
-                text_color="#FFFFFF",
+                fg_color="transparent",
+                hover_color="#1f242b",
+                text_color=policy_button_color,
+                border_color=policy_button_color,
+                border_width=2,
                 corner_radius=8,
                 command=lambda selected=policy: self.select_policy_manual(selected),
             )
@@ -865,7 +867,10 @@ class HapticUIView:
 
     def highlight_button(self, policy: str) -> None:
         for current, button in self.buttons.items():
-            button.configure(border_width=3 if current == policy else 0, border_color="#FFFFFF")
+            button.configure(
+                border_width=3 if current == policy else 2,
+                border_color=POLICY_COLORS["reassure"],
+            )
 
     def _animate_ecg(self) -> None:
         width = max(self.ecg_canvas.winfo_width(), 400)
