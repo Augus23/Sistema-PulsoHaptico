@@ -500,6 +500,7 @@ class HapticUIView:
         #    (por ejemplo: image_width, image_height = 800, 500)
         image_width = adapted_width
         image_height = adapted_height
+        self.policy_gallery_image_size = (image_width, image_height)
 
         # Dimensiones y centrado de la ventana de la galería según la imagen y el padding
         win_width = image_width + (padding_x * 2) + 20
@@ -559,6 +560,23 @@ class HapticUIView:
 
         gallery.protocol("WM_DELETE_WINDOW", close_gallery)
 
+    def _get_gallery_logo_image(self, static_base: Path) -> Optional[ctk.CTkImage]:
+        """Logo para la galería cuando no hay política activa, escalado sin deformar."""
+        cached = self.policy_gallery_image_cache.get("__logo__")
+        if cached is not None:
+            return cached
+        logo_path = static_base / "static" / "logo.jpeg"
+        try:
+            pil_img = Image.open(logo_path).copy()
+        except (FileNotFoundError, OSError):
+            return None
+        box_w, box_h = getattr(self, "policy_gallery_image_size", (900, 560))
+        scale = min(box_w / pil_img.width, box_h / pil_img.height)
+        size = (max(1, int(pil_img.width * scale)), max(1, int(pil_img.height * scale)))
+        logo_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=size)
+        self.policy_gallery_image_cache["__logo__"] = logo_img
+        return logo_img
+
     def _update_policy_gallery_image(
         self, image_files: Dict[str, str], static_base: Path
     ) -> None:
@@ -573,18 +591,25 @@ class HapticUIView:
         policy = self.displayed_policy
         image_label = self.policy_gallery_image_label
         if policy not in image_files:
+            # Sin política activa (inicio del programa o tras STOP): mostrar el logo.
             self.policy_gallery_title_label.configure(
                 text="SELECCIONE UNA POLÍTICA"
             )
-            self.policy_gallery_current_image = None
-            image_label.image = None
-            image_label.configure(
-                image=None,
-                compound="none",
-                text="Seleccione una política",
-                font=("Roboto", 18, "italic"),
-                text_color="#899895",
-            )
+            logo_img = self._get_gallery_logo_image(static_base)
+            if logo_img is not None:
+                self.policy_gallery_current_image = logo_img
+                image_label.image = logo_img
+                image_label.configure(image=logo_img, compound="center", text="")
+            else:
+                self.policy_gallery_current_image = None
+                image_label.image = None
+                image_label.configure(
+                    image=None,
+                    compound="none",
+                    text="Seleccione una política",
+                    font=("Roboto", 18, "italic"),
+                    text_color="#899895",
+                )
             return
 
         image_path = static_base / image_files[policy]
