@@ -31,12 +31,10 @@ ctk.set_default_color_theme("blue")
 class DemoOrchestrator(threading.Thread):
     def __init__(
         self,
-        worker: SerialWorkerThread,
         on_change_cb: Callable[[str], None],
         on_tick_cb: Callable[[int], None],
     ):
         super().__init__(daemon=True)
-        self.worker = worker
         self.on_change_cb = on_change_cb
         self.on_tick_cb = on_tick_cb
         self.running = False
@@ -204,13 +202,13 @@ class HapticUIView:
         )
         self.lbl_smooth = ctk.CTkLabel(
             telemetry_frame,
-            text="Undefined: --",
+            text="Pulso: --",
             font=("Roboto", 18, "bold"),
             anchor="center",
         )
         self.lbl_delta = ctk.CTkLabel(
             telemetry_frame,
-            text="Undefined: --",
+            text="Delta: --",
             font=("Roboto", 18, "bold"),
             anchor="e",
         )
@@ -323,8 +321,6 @@ class HapticUIView:
         self.image_frame.grid_columnconfigure(0, weight=1)
         self.image_frame.grid_rowconfigure(0, weight=0)
         button_frame.pack_forget()
-        self.image_frame.pack_forget()
-        self.image_frame.pack(fill="x", expand=False, padx=20, pady=(2, 2))
         button_frame.pack(fill="x", padx=20, pady=(6, 8))
 
         # ---- RIGHT SIDE: motors grid, fills the full height ----
@@ -338,49 +334,6 @@ class HapticUIView:
         self.motor_canvas.grid(row=0, column=0, padx=14, pady=14, sticky="nsew")
         self.motor_canvas.bind("<Configure>", self._resize_policy_content)
 
-        self.motor_info_frame = ctk.CTkFrame(self.image_frame, fg_color="transparent")
-        self.motor_info_frame.grid(
-            row=0, column=0, padx=(10, 18), pady=18, sticky="nsew"
-        )
-        self.motor_info_frame.grid_columnconfigure(0, weight=1)
-        self.motor_info_frame.grid_rowconfigure(0, weight=0)
-        self.motor_info_frame.grid_rowconfigure(1, weight=1)
-
-        self.motor_policy_label = ctk.CTkLabel(
-            self.motor_info_frame,
-            text="Política Activa:\nNINGUNA",
-            font=("Roboto", 18, "bold"),
-            text_color="#00ADB5",
-            justify="center",
-            wraplength=300,
-        )
-        self.motor_policy_label.pack(pady=(10, 14), fill="x")
-
-        self.motor_policy_description_label = ctk.CTkLabel(
-            self.motor_info_frame,
-            text="",
-            font=("Roboto", 16),
-            text_color="#D2D8D6",
-            anchor="center",
-            justify="center",
-            wraplength=300,
-        )
-        self.motor_policy_description_label.pack(fill="both", expand=True, padx=10)
-        self.motor_policy_label.pack_forget()
-        self.motor_policy_description_label.pack_forget()
-        self.motor_info_frame.grid_remove()
-
-        self.scenario_level_label = ctk.CTkLabel(
-            self.image_frame,
-            text="SIN POLITICA ACTIVA",
-            font=("Roboto", 14, "bold"),
-            text_color="#00ADB5",
-            anchor="w",
-            justify="left",
-        )
-        self.scenario_level_label.grid(
-            row=0, column=0, padx=(8, 16), pady=(2, 0), sticky="ew"
-        )
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
             text="Seleccione una política para ver su información",
@@ -439,26 +392,12 @@ class HapticUIView:
         self.scenario_response_label.grid(
             row=5, column=0, padx=(8, 16), pady=(0, 6), sticky="new"
         )
-        self.scenario_note_label = ctk.CTkLabel(
-            self.image_frame,
-            text="Ejemplos ilustrativos; cada persona vive los estimulos de manera distinta.",
-            font=("Roboto", 13, "italic"),
-            text_color="#899895",
-            anchor="w",
-            justify="left",
-            wraplength=320,
-        )
-        self.scenario_note_label.grid(
-            row=6, column=0, padx=(8, 16), pady=(0, 4), sticky="ew"
-        )
         for label in (
-            self.scenario_level_label,
             self.scenario_title_label,
             self.scenario_activation_heading_label,
             self.scenario_description_label,
             self.scenario_support_label,
             self.scenario_response_label,
-            self.scenario_note_label,
         ):
             label.grid_remove()
 
@@ -471,13 +410,10 @@ class HapticUIView:
                 return
             wrap_state["value"] = wrap
             for wrapped in (
-                self.motor_policy_label,
-                self.motor_policy_description_label,
                 self.scenario_title_label,
                 self.scenario_activation_heading_label,
                 self.scenario_description_label,
                 self.scenario_response_label,
-                self.scenario_note_label,
             ):
                 wrapped.configure(wraplength=wrap)
 
@@ -488,9 +424,7 @@ class HapticUIView:
         self.motor_sequence_token = 0
         self.motor_animation_after_id: Optional[str] = None
         self.policy_gallery_window: Optional[ctk.CTkToplevel] = None
-        self.policy_gallery_images: list[ctk.CTkImage] = []
         self.policy_gallery_image_cache: Dict[str, ctk.CTkImage] = {}
-        self.policy_gallery_current_image: Optional[ctk.CTkImage] = None
         self.policy_gallery_title_label: Optional[ctk.CTkLabel] = None
         self.policy_gallery_image_label: Optional[ctk.CTkLabel] = None
         self.update_displayed_image(None)
@@ -509,7 +443,6 @@ class HapticUIView:
         gallery.configure(fg_color="#1a1e24")
         gallery.minsize(400, 300)
         self.policy_gallery_window = gallery
-        self.policy_gallery_images = []
 
         padding_x = 5  # Padding horizontal
         padding_y = 3  # Padding vertical inferior
@@ -580,9 +513,7 @@ class HapticUIView:
 
         def close_gallery() -> None:
             self.policy_gallery_window = None
-            self.policy_gallery_images = []
             self.policy_gallery_image_cache = {}
-            self.policy_gallery_current_image = None
             self.policy_gallery_title_label = None
             self.policy_gallery_image_label = None
             gallery.destroy()
@@ -624,11 +555,9 @@ class HapticUIView:
             self.policy_gallery_title_label.configure(text="SELECCIONE UNA POLÍTICA")
             logo_img = self._get_gallery_logo_image(static_base)
             if logo_img is not None:
-                self.policy_gallery_current_image = logo_img
                 image_label.image = logo_img
                 image_label.configure(image=logo_img, compound="center", text="")
             else:
-                self.policy_gallery_current_image = None
                 image_label.image = None
                 image_label.configure(
                     image=None,
@@ -653,9 +582,6 @@ class HapticUIView:
                     size=(900, 560),
                 )
                 self.policy_gallery_image_cache[policy] = ctk_img
-            self.policy_gallery_current_image = ctk_img
-            if ctk_img not in self.policy_gallery_images:
-                self.policy_gallery_images.append(ctk_img)
             image_label.image = ctk_img
             image_label.configure(image=ctk_img, compound="center", text="")
         except (FileNotFoundError, OSError):
@@ -874,17 +800,15 @@ class HapticUIView:
         self.displayed_policy = policy
         self._update_policy_gallery_image(
             {
-                "awareness": "static/awareness.jpg",
-                "reassure": "static/reassure.jpg",
-                "breath": "static/breath.jpg",
-                "calm_down": "static/calm_down.jpg",
+                "awareness": "static/awareness.jpeg",
+                "reassure": "static/reassure.jpeg",
+                "breath": "static/breath.jpeg",
+                "calm_down": "static/calm_down.jpeg",
             },
             Path(__file__).resolve().parent,
         )
         if policy not in POLICY_SCENARIOS:
             self._draw_motor_map(None)
-            self.motor_policy_description_label.configure(text="")
-            self.scenario_level_label.configure(text="SIN POLITICA ACTIVA")
             self.scenario_title_label.configure(
                 text="Seleccione una política para ver su información"
             )
@@ -892,12 +816,10 @@ class HapticUIView:
             self.scenario_support_label.configure(text="ACOMPANAMIENTO HAPTICO")
             self.scenario_response_label.configure(text="")
             for label in (
-                self.scenario_level_label,
                 self.scenario_activation_heading_label,
                 self.scenario_description_label,
                 self.scenario_support_label,
                 self.scenario_response_label,
-                self.scenario_note_label,
             ):
                 label.grid_remove()
             self.scenario_title_label.grid()
@@ -930,7 +852,6 @@ class HapticUIView:
             self.scenario_response_label,
         ):
             label.grid()
-        self.scenario_note_label.grid_remove()
         self._resize_policy_content()
 
     def highlight_button(self, policy: str) -> None:
@@ -1103,7 +1024,6 @@ class HapticUIController:
             self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
         self.highlight_button(policy)
         self.worker.send_policy(policy)
-        self.motor_policy_label.configure(text=POLICY_LABELS[policy])
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
 
@@ -1121,7 +1041,6 @@ class HapticUIController:
             self.lbl_bpm.configure(text="BPM: 0")
             self.lbl_smooth.configure(text="Sin pulso")
             self.lbl_delta.configure(text="Sin política activa")
-        self.motor_policy_label.configure(text="Política Activa:\nDETENIDO")
         self.highlight_button("")
         self.update_displayed_image(None)
 
@@ -1129,7 +1048,7 @@ class HapticUIController:
         if self.auto_var.get():
             self.sequential_simulation = True
             self.orchestrator = DemoOrchestrator(
-                self.worker, self.on_auto_policy_change, self.on_auto_tick
+                self.on_auto_policy_change, self.on_auto_tick
             )
             self.orchestrator.start_demo()
         elif self.orchestrator:
@@ -1156,7 +1075,6 @@ class HapticUIController:
         self.ecg_transition_started_at = time.monotonic()
         self.worker.send_policy(policy)
         self.highlight_button(policy)
-        self.motor_policy_label.configure(text=POLICY_LABELS[policy])
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
 
