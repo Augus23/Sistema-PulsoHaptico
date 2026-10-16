@@ -466,11 +466,47 @@ class HapticUIView:
 
         gallery = ctk.CTkToplevel(self)
         gallery.title("Imágenes de políticas")
-        gallery.geometry("1000x700")
-        gallery.minsize(480, 360)
         gallery.configure(fg_color="#1a1e24")
+        gallery.minsize(400, 300)
         self.policy_gallery_window = gallery
         self.policy_gallery_images = []
+
+        # ==============================================================
+        # CONFIGURACIÓN: PADDING Y TAMAÑO DE LA IMAGEN
+        # ==============================================================
+        # 1. Padding: margen alrededor de la imagen (en píxeles)
+        padding_x = 5  # Padding horizontal
+        padding_y = 3  # Padding vertical inferior
+
+        # 2. Adaptación automática al tamaño de la pantalla (screen size)
+        screen_width = gallery.winfo_screenwidth()
+        screen_height = gallery.winfo_screenheight()
+
+        # Espacio disponible en pantalla (75% del ancho y 70% del alto) descontando padding y título
+        avail_width = max(320, int(screen_width * 0.9) - (padding_x * 2))
+        avail_height = max(200, int(screen_height * 0.9) - (padding_y * 2) - 80)
+
+        # Proporción de aspecto (aspect ratio) de la imagen (900x560)
+        aspect_ratio = 900 / 560
+        if avail_width / aspect_ratio <= avail_height:
+            adapted_width = avail_width
+            adapted_height = int(avail_width / aspect_ratio)
+        else:
+            adapted_height = avail_height
+            adapted_width = int(avail_height * aspect_ratio)
+
+        # 3. Tamaño final de la imagen:
+        # -> Para cambiar el tamaño manualmente a un valor fijo, modifique los valores abajo:
+        #    (por ejemplo: image_width, image_height = 800, 500)
+        image_width = adapted_width
+        image_height = adapted_height
+
+        # Dimensiones y centrado de la ventana de la galería según la imagen y el padding
+        win_width = image_width + (padding_x * 2) + 20
+        win_height = image_height + (padding_y * 2) + 90
+        pos_x = max(0, (screen_width - win_width) // 2)
+        pos_y = max(0, (screen_height - win_height) // 2)
+        gallery.geometry(f"{win_width}x{win_height}+{pos_x}+{pos_y}")
 
         self.policy_gallery_title_label = ctk.CTkLabel(
             gallery,
@@ -488,11 +524,27 @@ class HapticUIView:
         }
 
         static_base = Path(__file__).resolve().parent
+
+        # Pre-cargar imágenes en caché con el tamaño adaptado/configurado
+        self.policy_gallery_image_cache = {}
+        for pol, rel_path in image_files.items():
+            img_path = static_base / rel_path
+            if img_path.exists():
+                try:
+                    pil_img = Image.open(img_path).copy()
+                    self.policy_gallery_image_cache[pol] = ctk.CTkImage(
+                        light_image=pil_img,
+                        dark_image=pil_img,
+                        size=(image_width, image_height),
+                    )
+                except (FileNotFoundError, OSError):
+                    pass
+
         self.policy_gallery_image_label = ctk.CTkLabel(
             gallery, text="", fg_color="transparent"
         )
         self.policy_gallery_image_label.pack(
-            fill="both", expand=True, padx=24, pady=(0, 24)
+            fill="both", expand=True, padx=padding_x, pady=(0, padding_y)
         )
         self._update_policy_gallery_image(image_files, static_base)
 
