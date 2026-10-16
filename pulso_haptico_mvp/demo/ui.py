@@ -294,7 +294,7 @@ class HapticUIView:
         self.image_frame = ctk.CTkFrame(
             left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
-        self.image_frame.configure(height=220)
+        self.image_frame.configure(height=160)
         self.image_frame.pack(fill="x", expand=False, padx=20, pady=(2, 2))
         self.image_frame.grid_propagate(False)
         self.image_frame.grid_columnconfigure(0, weight=1)
@@ -369,7 +369,7 @@ class HapticUIView:
         self.scenario_activation_heading_label = ctk.CTkLabel(
             self.image_frame,
             text="ACTIVACIÓN",
-            font=("Roboto", 18, "bold"),
+            font=("Roboto", 15, "bold"),
             text_color="#00ADB5",
             anchor="w",
             justify="left",
@@ -380,7 +380,7 @@ class HapticUIView:
         self.scenario_description_label = ctk.CTkLabel(
             self.image_frame,
             text="Selecciona una politica para ver una situacion posible asociada a ella.",
-            font=("Roboto", 19),
+            font=("Roboto", 15),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
@@ -392,7 +392,7 @@ class HapticUIView:
         self.scenario_support_label = ctk.CTkLabel(
             self.image_frame,
             text="PROPUESTA",
-            font=("Roboto", 18, "bold"),
+            font=("Roboto", 15, "bold"),
             text_color="#00ADB5",
             anchor="w",
             justify="left",
@@ -403,7 +403,7 @@ class HapticUIView:
         self.scenario_response_label = ctk.CTkLabel(
             self.image_frame,
             text="",
-            font=("Roboto", 19),
+            font=("Roboto", 15),
             text_color="#D2D8D6",
             anchor="nw",
             justify="left",
@@ -526,10 +526,10 @@ class HapticUIView:
         self.policy_gallery_title_label.pack(pady=(18, 12))
 
         image_files = {
-            "awareness": "static/awareness.jpg",
-            "reassure": "static/reassure.jpg",
-            "breath": "static/breath.jpg",
-            "calm_down": "static/calm_down.jpg",
+            "awareness": "static/awareness.jpeg",
+            "reassure": "static/reassure.jpeg",
+            "breath": "static/breath.jpeg",
+            "calm_down": "static/calm_down.jpeg",
         }
 
         static_base = Path(__file__).resolve().parent
@@ -1190,57 +1190,4 @@ class HapticDemoApp(ctk.CTk, HapticUIView, HapticUIController):
         # Inicialización de interfaces y rutinas
         self._build_ui(is_mock)
         self._animate_ecg()
-
-
-# def main() -> int:
-#     parser = argparse.ArgumentParser(description="Panel de control del pulso háptico (modo mock o hardware real).")
-#     parser.add_argument("--mock", action="store_true", help="Ejecuta la UI con el simulador del Arduino")
-#     parser.add_argument("--port", help="Puerto Serial real (ej. /dev/ttyUSB0 o COM5)")
-#     parser.add_argument("--baud", type=int, default=115200, help="Velocidad del puerto serial")
-#     parser.add_argument("--catalog", default="patterns", help="Carpeta con los patrones JSON")
-#     args = parser.parse_args()
-
-#     try:
-#         catalog = load_catalog(Path(args.catalog))
-#     except Exception as exc:
-#         print(f"[ERROR] Falló la carga del catálogo: {exc}")
-#         return 1
-
-#     if args.mock:
-#         ser_instance = MockArduinoSerial()
-#     else:
-#         try:
-#             import serial
-#         except ImportError:
-#             print("ERROR: falta instalar pyserial. Ejecutá: pip install pyserial", file=sys.stderr)
-#             return 1
-
-#         if not args.port:
-#             print("[ERROR] No se seleccionó puerto. Si no tienes hardware, usa --mock")
-#             return 1
-
-#         try:
-#             ser_instance = serial.Serial(port=args.port, baudrate=args.baud, timeout=1.0)
-#             time.sleep(2.0)
-#             ser_instance.reset_input_buffer()
-#         except serial.SerialException as exc:
-#             print(f"[ERROR] No se pudo abrir puerto {args.port}: {exc}")
-#             return 1
-
-#     worker = SerialWorkerThread(ser_instance, catalog)
-#     worker.start()
-#     app = HapticDemoApp(worker, is_mock=args.mock)
-
-#     def on_closing() -> None:
-#         if app.orchestrator:
-#             app.orchestrator.stop_demo()
-#         worker.stop()
-#         app.destroy()
-
-#     app.protocol("WM_DELETE_WINDOW", on_closing)
-#     app.mainloop()
-#     return 0
-
-
-# if __name__ == "__main__":
-#     sys.exit(main())
+        
