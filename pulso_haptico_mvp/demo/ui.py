@@ -1,18 +1,15 @@
-import argparse
+import math
 import threading
 import time
-import math
-import sys
+import tkinter as tk
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import customtkinter as ctk
-import tkinter as tk
 from PIL import Image
 
-from demo.config import EffectivePattern
-from demo.hardware import MockArduinoSerial, SerialWorkerThread
-from demo.protocol import build_effective_pattern, load_catalog
+from demo.hardware import SerialWorkerThread
+from demo.protocol import build_effective_pattern
 from demo.constants import (
     DEMO_STEP_DURATION_SEC,
     SEQUENTIAL_POLICIES,
@@ -21,11 +18,8 @@ from demo.constants import (
     POLICY_LABELS,
     POLICY_SCENARIOS,
     MOCK_ECG_POLICY_LEVELS,
-    MOTOR_POLICY_DESCRIPTIONS,
     POLICY_COLORS,
 )
-
-
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -38,7 +32,7 @@ class DemoOrchestrator(threading.Thread):
     def __init__(
         self,
         worker: SerialWorkerThread,
-        on_change_cb: Callable[[str, int], None],
+        on_change_cb: Callable[[str], None],
         on_tick_cb: Callable[[int], None],
     ):
         super().__init__(daemon=True)
@@ -73,7 +67,7 @@ class DemoOrchestrator(threading.Thread):
             target_bpm = float(BPM_CONFIG[current_policy]["bpm"])
 
             # Notify UI that a new policy step is starting
-            self.on_change_cb(current_policy, int(DEMO_STEP_DURATION_SEC))
+            self.on_change_cb(current_policy)
 
             # Linear ramp: fake_bpm goes from its current value to target_bpm
             # over exactly DEMO_STEP_DURATION_SEC seconds, clamped once reached
@@ -125,8 +119,6 @@ class DemoOrchestrator(threading.Thread):
                     self.current_policy_index -= 1
 
 
-
-
 # =============================================================================
 # MÓDULO DE INTERFAZ GRÁFICA (VISTA)
 # =============================================================================
@@ -135,9 +127,7 @@ class HapticUIView:
     Clase responsable exclusivamente de la inicialización, manipulación visual,
     imágenes, animaciones de canvas y actualización gráfica (CustomTkinter).
     """
-   
 
-    # Drop-in replacement for HapticUIView._build_ui (everything else in the file stays untouched).
     def _build_ui(self, is_mock: bool) -> None:
         # ---- Root layout: left column (everything) + right column (motors grid) ----
         self.grid_columnconfigure(0, weight=11, uniform="main_cols")
@@ -148,8 +138,12 @@ class HapticUIView:
         left_panel.grid(row=0, column=0, sticky="nsew")
 
         motor_panel = ctk.CTkFrame(
-            self, fg_color="#1f242b", border_width=2, border_color="#2a3038",
-            corner_radius=12, width=100,
+            self,
+            fg_color="#1f242b",
+            border_width=2,
+            border_color="#2a3038",
+            corner_radius=12,
+            width=100,
         )
         motor_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 20), pady=(8, 14))
         motor_panel.grid_propagate(False)
@@ -190,17 +184,36 @@ class HapticUIView:
             command=self.toggle_auto_mode,
         ).pack(side="left", padx=18, pady=10)
         self.timer_label = ctk.CTkLabel(
-            auto_frame, text="Timer: --s", font=("Roboto", 17, "bold"), text_color="#00ADB5"
+            auto_frame,
+            text="Timer: --s",
+            font=("Roboto", 17, "bold"),
+            text_color="#00ADB5",
         )
         self.timer_label.pack(side="right", padx=18)
 
         telemetry_frame = ctk.CTkFrame(
-            left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
+            left_panel,
+            fg_color="#1f242b",
+            border_width=2,
+            border_color="#2a3038",
+            corner_radius=12,
         )
         telemetry_frame.pack(fill="x", padx=20, pady=4)
-        self.lbl_bpm = ctk.CTkLabel(telemetry_frame, text="BPM: --", font=("Roboto", 18, "bold"), anchor="w")
-        self.lbl_smooth = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"), anchor="center")
-        self.lbl_delta = ctk.CTkLabel(telemetry_frame, text="Undefined: --", font=("Roboto", 18, "bold"), anchor="e")
+        self.lbl_bpm = ctk.CTkLabel(
+            telemetry_frame, text="BPM: --", font=("Roboto", 18, "bold"), anchor="w"
+        )
+        self.lbl_smooth = ctk.CTkLabel(
+            telemetry_frame,
+            text="Undefined: --",
+            font=("Roboto", 18, "bold"),
+            anchor="center",
+        )
+        self.lbl_delta = ctk.CTkLabel(
+            telemetry_frame,
+            text="Undefined: --",
+            font=("Roboto", 18, "bold"),
+            anchor="e",
+        )
         self.lbl_bpm.grid(row=0, column=0, padx=(14, 4), pady=(6, 2), sticky="ew")
         self.lbl_smooth.grid(row=0, column=1, padx=4, pady=(6, 2), sticky="ew")
         self.lbl_delta.grid(row=0, column=2, padx=(4, 14), pady=(6, 2), sticky="ew")
@@ -221,12 +234,18 @@ class HapticUIView:
             highlightthickness=1,
             highlightbackground="#2a3038",
         )
-        self.ecg_canvas.grid(row=2, column=0, columnspan=3, padx=12, pady=(2, 8), sticky="ew")
+        self.ecg_canvas.grid(
+            row=2, column=0, columnspan=3, padx=12, pady=(2, 8), sticky="ew"
+        )
         telemetry_frame.grid_rowconfigure(2, weight=1)
 
         # ---- Buttons: policies in a 2x2 grid, STOP / VER IMÁGENES on the right ----
         button_frame = ctk.CTkFrame(
-            left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
+            left_panel,
+            fg_color="#1f242b",
+            border_width=2,
+            border_color="#2a3038",
+            corner_radius=12,
         )
         button_frame.pack(fill="x", padx=20, pady=4)
         ctk.CTkLabel(
@@ -292,7 +311,11 @@ class HapticUIView:
 
         # ---- Policy info (left) ----
         self.image_frame = ctk.CTkFrame(
-            left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
+            left_panel,
+            fg_color="#1f242b",
+            border_width=2,
+            border_color="#2a3038",
+            corner_radius=12,
         )
         self.image_frame.configure(height=160)
         self.image_frame.pack(fill="x", expand=False, padx=20, pady=(2, 2))
@@ -355,7 +378,9 @@ class HapticUIView:
             anchor="w",
             justify="left",
         )
-        self.scenario_level_label.grid(row=0, column=0, padx=(8, 16), pady=(2, 0), sticky="ew")
+        self.scenario_level_label.grid(
+            row=0, column=0, padx=(8, 16), pady=(2, 0), sticky="ew"
+        )
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
             text="Seleccione una política para ver su información",
@@ -365,7 +390,9 @@ class HapticUIView:
             justify="center",
             wraplength=320,
         )
-        self.scenario_title_label.grid(row=1, column=0, padx=(8, 16), pady=(6, 8), sticky="ew")
+        self.scenario_title_label.grid(
+            row=1, column=0, padx=(8, 16), pady=(6, 8), sticky="ew"
+        )
         self.scenario_activation_heading_label = ctk.CTkLabel(
             self.image_frame,
             text="ACTIVACIÓN",
@@ -421,7 +448,9 @@ class HapticUIView:
             justify="left",
             wraplength=320,
         )
-        self.scenario_note_label.grid(row=6, column=0, padx=(8, 16), pady=(0, 4), sticky="ew")
+        self.scenario_note_label.grid(
+            row=6, column=0, padx=(8, 16), pady=(0, 4), sticky="ew"
+        )
         for label in (
             self.scenario_level_label,
             self.scenario_title_label,
@@ -468,7 +497,10 @@ class HapticUIView:
         self.image_frame.bind("<Configure>", self._resize_policy_content, add="+")
 
     def open_policy_gallery(self) -> None:
-        if self.policy_gallery_window is not None and self.policy_gallery_window.winfo_exists():
+        if (
+            self.policy_gallery_window is not None
+            and self.policy_gallery_window.winfo_exists()
+        ):
             self.policy_gallery_window.focus()
             return
 
@@ -479,22 +511,16 @@ class HapticUIView:
         self.policy_gallery_window = gallery
         self.policy_gallery_images = []
 
-        # ==============================================================
-        # CONFIGURACIÓN: PADDING Y TAMAÑO DE LA IMAGEN
-        # ==============================================================
-        # 1. Padding: margen alrededor de la imagen (en píxeles)
         padding_x = 5  # Padding horizontal
         padding_y = 3  # Padding vertical inferior
 
-        # 2. Adaptación automática al tamaño de la pantalla (screen size)
         screen_width = gallery.winfo_screenwidth()
         screen_height = gallery.winfo_screenheight()
 
-        # Espacio disponible en pantalla (75% del ancho y 70% del alto) descontando padding y título
         avail_width = max(320, int(screen_width * 0.9) - (padding_x * 2))
         avail_height = max(200, int(screen_height * 0.9) - (padding_y * 2) - 80)
 
-        # Proporción de aspecto (aspect ratio) de la imagen (900x560)
+        # Conserva la proporción de aspecto al ajustar la imagen a la pantalla.
         aspect_ratio = 900 / 560
         if avail_width / aspect_ratio <= avail_height:
             adapted_width = avail_width
@@ -503,14 +529,10 @@ class HapticUIView:
             adapted_height = avail_height
             adapted_width = int(avail_height * aspect_ratio)
 
-        # 3. Tamaño final de la imagen:
-        # -> Para cambiar el tamaño manualmente a un valor fijo, modifique los valores abajo:
-        #    (por ejemplo: image_width, image_height = 800, 500)
         image_width = adapted_width
         image_height = adapted_height
         self.policy_gallery_image_size = (image_width, image_height)
 
-        # Dimensiones y centrado de la ventana de la galería según la imagen y el padding
         win_width = image_width + (padding_x * 2) + 20
         win_height = image_height + (padding_y * 2) + 90
         pos_x = max(0, (screen_width - win_width) // 2)
@@ -534,7 +556,6 @@ class HapticUIView:
 
         static_base = Path(__file__).resolve().parent
 
-        # Pre-cargar imágenes en caché con el tamaño adaptado/configurado
         self.policy_gallery_image_cache = {}
         for pol, rel_path in image_files.items():
             img_path = static_base / rel_path
@@ -600,9 +621,7 @@ class HapticUIView:
         image_label = self.policy_gallery_image_label
         if policy not in image_files:
             # Sin política activa (inicio del programa o tras STOP): mostrar el logo.
-            self.policy_gallery_title_label.configure(
-                text="SELECCIONE UNA POLÍTICA"
-            )
+            self.policy_gallery_title_label.configure(text="SELECCIONE UNA POLÍTICA")
             logo_img = self._get_gallery_logo_image(static_base)
             if logo_img is not None:
                 self.policy_gallery_current_image = logo_img
@@ -667,20 +686,48 @@ class HapticUIView:
         radius = min(radius, (x2 - x1) / 2, (y2 - y1) / 2)
         outline = kwargs.pop("outline", "")
         self.motor_canvas.create_arc(
-            x1, y1, x1 + 2 * radius, y1 + 2 * radius,
-            start=90, extent=90, style="arc", outline=outline, **kwargs
+            x1,
+            y1,
+            x1 + 2 * radius,
+            y1 + 2 * radius,
+            start=90,
+            extent=90,
+            style="arc",
+            outline=outline,
+            **kwargs,
         )
         self.motor_canvas.create_arc(
-            x2 - 2 * radius, y1, x2, y1 + 2 * radius,
-            start=0, extent=90, style="arc", outline=outline, **kwargs
+            x2 - 2 * radius,
+            y1,
+            x2,
+            y1 + 2 * radius,
+            start=0,
+            extent=90,
+            style="arc",
+            outline=outline,
+            **kwargs,
         )
         self.motor_canvas.create_arc(
-            x2 - 2 * radius, y2 - 2 * radius, x2, y2,
-            start=270, extent=90, style="arc", outline=outline, **kwargs
+            x2 - 2 * radius,
+            y2 - 2 * radius,
+            x2,
+            y2,
+            start=270,
+            extent=90,
+            style="arc",
+            outline=outline,
+            **kwargs,
         )
         self.motor_canvas.create_arc(
-            x1, y2 - 2 * radius, x1 + 2 * radius, y2,
-            start=180, extent=90, style="arc", outline=outline, **kwargs
+            x1,
+            y2 - 2 * radius,
+            x1 + 2 * radius,
+            y2,
+            start=180,
+            extent=90,
+            style="arc",
+            outline=outline,
+            **kwargs,
         )
         self.motor_canvas.create_line(
             x1 + radius, y1, x2 - radius, y1, fill=outline, **kwargs
@@ -712,7 +759,8 @@ class HapticUIView:
             right + radius + 11,
             bottom + 20,
             frame_radius,
-            outline="#607177", width=2,
+            outline="#607177",
+            width=2,
             tags="motor",
         )
         positions = [
@@ -728,13 +776,24 @@ class HapticUIView:
             fill = "#00ADB5" if active else "#39464b"
             outline = "#8ee8da" if active else "#718087"
             self.motor_canvas.create_oval(
-                x - radius, y - radius, x + radius, y + radius,
-                fill=fill, outline=outline, width=2, tags="motor"
+                x - radius,
+                y - radius,
+                x + radius,
+                y + radius,
+                fill=fill,
+                outline=outline,
+                width=2,
+                tags="motor",
             )
             self.motor_canvas.create_text(
-                x, y, text=f"M{motor}", fill="#FFFFFF",
-                font=("Roboto", 11, "bold"), tags="motor"
+                x,
+                y,
+                text=f"M{motor}",
+                fill="#FFFFFF",
+                font=("Roboto", 11, "bold"),
+                tags="motor",
             )
+
     def _cancel_motor_sequence(self) -> None:
         self.motor_sequence_token += 1
         if self.motor_animation_after_id is not None:
@@ -855,7 +914,6 @@ class HapticUIView:
         else:
             activation_text = description
             proposal_text = ""
-        policy_name = POLICY_LABELS.get(policy, policy)
         self.scenario_title_label.configure(
             text=f"Propuesta vibrotáctil activa: {POLICY_LABELS[policy]}"
         )
@@ -896,12 +954,15 @@ class HapticUIView:
         if self.sequential_simulation:
             elapsed = time.monotonic() - self.ecg_transition_started_at
             progress = min(elapsed / DEMO_STEP_DURATION_SEC, 1.0)
-            self.ecg_bpm = self.ecg_transition_from_bpm + (
-                self.ecg_target_bpm - self.ecg_transition_from_bpm
-            ) * progress
-            self.ecg_amplitude = self.ecg_transition_from_amplitude + (
-                self.ecg_target_amplitude - self.ecg_transition_from_amplitude
-            ) * progress
+            self.ecg_bpm = (
+                self.ecg_transition_from_bpm
+                + (self.ecg_target_bpm - self.ecg_transition_from_bpm) * progress
+            )
+            self.ecg_amplitude = (
+                self.ecg_transition_from_amplitude
+                + (self.ecg_target_amplitude - self.ecg_transition_from_amplitude)
+                * progress
+            )
 
         if not self.ecg_signal_ok and self.ecg_policy is None:
             waiting_text = (
@@ -910,13 +971,15 @@ class HapticUIView:
                 else "Esperando una señal de pulso..."
             )
             self.ecg_canvas.create_line(
-                0, middle, width, middle,
-                fill="#3d5960", width=2, tags="wave"
+                0, middle, width, middle, fill="#3d5960", width=2, tags="wave"
             )
             self.ecg_canvas.create_text(
-                width / 2, middle - 18,
+                width / 2,
+                middle - 18,
                 text=waiting_text,
-                fill="#71858a", font=("Roboto", 11), tags="wave"
+                fill="#71858a",
+                font=("Roboto", 11),
+                tags="wave",
             )
         else:
             bpm = max(self.ecg_bpm, 40.0)
@@ -952,11 +1015,15 @@ class HapticUIView:
                 for division in range(1, 12):
                     x = width * division / 12
                     color = "#26373a" if division % 3 == 0 else "#1c2a2d"
-                    self.ecg_canvas.create_line(x, 0, x, height, fill=color, width=1, tags="wave")
+                    self.ecg_canvas.create_line(
+                        x, 0, x, height, fill=color, width=1, tags="wave"
+                    )
                 for division in range(1, 4):
                     y = height * division / 4
                     color = "#26373a" if division == 2 else "#1c2a2d"
-                    self.ecg_canvas.create_line(0, y, width, y, fill=color, width=1, tags="wave")
+                    self.ecg_canvas.create_line(
+                        0, y, width, y, fill=color, width=1, tags="wave"
+                    )
                 self.ecg_canvas.create_text(
                     width - 10,
                     11,
@@ -972,11 +1039,11 @@ class HapticUIView:
                 beat_phase = (sample_time % period) / period
                 if use_mock_visuals:
                     pulse = (
-                        0.12 * math.exp(-((beat_phase - 0.18) / 0.05) ** 2)
-                        - 0.12 * math.exp(-((beat_phase - 0.29) / 0.025) ** 2)
-                        + 0.78 * math.exp(-((beat_phase - 0.33) / 0.022) ** 2)
-                        - 0.20 * math.exp(-((beat_phase - 0.37) / 0.028) ** 2)
-                        + 0.24 * math.exp(-((beat_phase - 0.60) / 0.09) ** 2)
+                        0.12 * math.exp(-(((beat_phase - 0.18) / 0.05) ** 2))
+                        - 0.12 * math.exp(-(((beat_phase - 0.29) / 0.025) ** 2))
+                        + 0.78 * math.exp(-(((beat_phase - 0.33) / 0.022) ** 2))
+                        - 0.20 * math.exp(-(((beat_phase - 0.37) / 0.028) ** 2))
+                        + 0.24 * math.exp(-(((beat_phase - 0.60) / 0.09) ** 2))
                     )
                     if self.ecg_policy == "calm_down":
                         pulse *= 2.15
@@ -988,11 +1055,11 @@ class HapticUIView:
                         pulse *= 1.25
                 else:
                     pulse = (
-                        0.14 * math.exp(-((beat_phase - 0.18) / 0.045) ** 2)
-                        - 0.16 * math.exp(-((beat_phase - 0.30) / 0.018) ** 2)
-                        + 1.00 * math.exp(-((beat_phase - 0.34) / 0.012) ** 2)
-                        - 0.30 * math.exp(-((beat_phase - 0.38) / 0.020) ** 2)
-                        + 0.28 * math.exp(-((beat_phase - 0.60) / 0.085) ** 2)
+                        0.14 * math.exp(-(((beat_phase - 0.18) / 0.045) ** 2))
+                        - 0.16 * math.exp(-(((beat_phase - 0.30) / 0.018) ** 2))
+                        + 1.00 * math.exp(-(((beat_phase - 0.34) / 0.012) ** 2))
+                        - 0.30 * math.exp(-(((beat_phase - 0.38) / 0.020) ** 2))
+                        + 0.28 * math.exp(-(((beat_phase - 0.60) / 0.085) ** 2))
                     )
                 points.extend((x, middle - pulse * amplitude))
 
@@ -1005,8 +1072,7 @@ class HapticUIView:
             )
             if not use_mock_visuals:
                 self.ecg_canvas.create_line(
-                    0, middle, width, middle,
-                    fill="#23444a", width=1, tags="wave"
+                    0, middle, width, middle, fill="#23444a", width=1, tags="wave"
                 )
 
         self.after(50, self._animate_ecg)
@@ -1023,6 +1089,7 @@ class HapticUIController:
     Controlador que maneja el flujo de la aplicación, interacción del usuario,
     el orquestador lógico (worker) y la actualización unificada de telemetría.
     """
+
     def select_policy_manual(self, policy: str) -> None:
         if self.auto_var.get():
             self.auto_var.set(False)
@@ -1030,16 +1097,13 @@ class HapticUIController:
         self.sequential_simulation = False
         self.ecg_policy = policy
         if self.is_mock:
-            self.ecg_policy = policy
             self.ecg_amplitude = float(BPM_CONFIG[policy]["amplitude"])
             self.ecg_bpm = float(BPM_CONFIG[policy]["bpm"])
             self.ecg_signal_ok = True
             self.lbl_bpm.configure(text=f"BPM: {round(self.ecg_bpm)}")
         self.highlight_button(policy)
         self.worker.send_policy(policy)
-        self.motor_policy_label.configure(
-            text=POLICY_LABELS[policy]
-        )
+        self.motor_policy_label.configure(text=POLICY_LABELS[policy])
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
 
@@ -1064,7 +1128,9 @@ class HapticUIController:
     def toggle_auto_mode(self) -> None:
         if self.auto_var.get():
             self.sequential_simulation = True
-            self.orchestrator = DemoOrchestrator(self.worker, self.on_auto_policy_change, self.on_auto_tick)
+            self.orchestrator = DemoOrchestrator(
+                self.worker, self.on_auto_policy_change, self.on_auto_tick
+            )
             self.orchestrator.start_demo()
         elif self.orchestrator:
             self.sequential_simulation = False
@@ -1072,10 +1138,12 @@ class HapticUIController:
             self.orchestrator = None
             self.timer_label.configure(text="Timer: --s")
 
-    def on_auto_policy_change(self, policy: str, duration: int) -> None:
+    def on_auto_policy_change(self, policy: str) -> None:
         self.after(
             0,
-            lambda: self._update_auto_ui(policy) if self.sequential_simulation else None,
+            lambda: (
+                self._update_auto_ui(policy) if self.sequential_simulation else None
+            ),
         )
 
     def _update_auto_ui(self, policy: str) -> None:
@@ -1084,13 +1152,11 @@ class HapticUIController:
         self.ecg_transition_from_bpm = self.ecg_bpm
         self.ecg_transition_from_amplitude = self.ecg_amplitude
         self.ecg_target_bpm = float(BPM_CONFIG[policy]["bpm"])
-        self.ecg_target_amplitude = float(BPM_CONFIG[policy]["amplitude"])        
+        self.ecg_target_amplitude = float(BPM_CONFIG[policy]["amplitude"])
         self.ecg_transition_started_at = time.monotonic()
         self.worker.send_policy(policy)
         self.highlight_button(policy)
-        self.motor_policy_label.configure(
-            text=POLICY_LABELS[policy]
-        )
+        self.motor_policy_label.configure(text=POLICY_LABELS[policy])
         self.update_displayed_image(policy)
         self._start_motor_sequence(policy)
 
@@ -1105,10 +1171,12 @@ class HapticUIController:
                 data["signal_ok"] = "1"
                 fake_bpm = self.orchestrator.fake_bpm
                 baseline_bpm = 70
-                data['delta'] = str(max(0, int(fake_bpm - baseline_bpm)))
-                data['policy'] = SEQUENTIAL_POLICIES[self.orchestrator.current_policy_index]
-                data['baseline_bpm'] = str(baseline_bpm)
-                data['bpm'] = str(int(fake_bpm))
+                data["delta"] = str(max(0, int(fake_bpm - baseline_bpm)))
+                data["policy"] = SEQUENTIAL_POLICIES[
+                    self.orchestrator.current_policy_index
+                ]
+                data["baseline_bpm"] = str(baseline_bpm)
+                data["bpm"] = str(int(fake_bpm))
 
             if self.is_mock and self.ecg_policy is None and not self.auto_var.get():
                 self.ecg_signal_ok = False
@@ -1142,11 +1210,17 @@ class HapticUIController:
                 return
             self.lbl_bpm.configure(text=f"BPM: {data.get('bpm', '--')}")
             if data.get("phase") == "run":
-                self.lbl_smooth.configure(text=f"Pulso base: {data.get('baseline_bpm', '--')}")
+                self.lbl_smooth.configure(
+                    text=f"Pulso base: {data.get('baseline_bpm', '--')}"
+                )
                 self.lbl_delta.configure(text=f"Delta: {data.get('delta', '--')}")
             else:
-                self.lbl_smooth.configure(text=f"Pulso promedio: {data.get('beat_avg', '--')}")
-                self.lbl_delta.configure(text=f"Muestras: {data.get('baseline_samples', '--')}")
+                self.lbl_smooth.configure(
+                    text=f"Pulso promedio: {data.get('beat_avg', '--')}"
+                )
+                self.lbl_delta.configure(
+                    text=f"Muestras: {data.get('baseline_samples', '--')}"
+                )
 
             # Policy changes in auto mode are driven exclusively by the orchestrator
             # (via on_change_cb → _update_auto_ui). No reactive switch needed here.
@@ -1162,6 +1236,7 @@ class HapticDemoApp(ctk.CTk, HapticUIView, HapticUIController):
     Clase principal que hereda de CustomTkinter, la Vista y el Controlador.
     Mantiene la firma original exacta y ensambla la aplicación.
     """
+
     def __init__(self, worker: SerialWorkerThread, is_mock: bool = False):
         super().__init__()
         self.worker = worker
@@ -1174,7 +1249,7 @@ class HapticDemoApp(ctk.CTk, HapticUIView, HapticUIController):
         self.configure(fg_color="#1a1e24")
         self.worker.on_telemetry_received = self.update_telemetry
         self.worker.on_log_message = self.append_log
-        
+
         # Variables de estado y animación
         self.ecg_bpm = 70.0
         self.ecg_amplitude = 0.0
@@ -1186,8 +1261,7 @@ class HapticDemoApp(ctk.CTk, HapticUIView, HapticUIController):
         self.ecg_transition_from_amplitude = 0.0
         self.ecg_signal_ok = False
         self.sequential_simulation = False
-        
+
         # Inicialización de interfaces y rutinas
         self._build_ui(is_mock)
         self._animate_ecg()
-        
