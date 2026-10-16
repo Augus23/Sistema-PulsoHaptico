@@ -229,8 +229,14 @@ class HapticUIView:
             left_panel, fg_color="#1f242b", border_width=2, border_color="#2a3038", corner_radius=12
         )
         button_frame.pack(fill="x", padx=20, pady=4)
+        ctk.CTkLabel(
+            button_frame,
+            text="Propuestas vibrotáctiles",
+            font=("Roboto", 18, "bold"),
+            text_color="#EEEEEE",
+        ).pack(pady=(8, 0))
         button_container = ctk.CTkFrame(button_frame, fg_color="transparent")
-        button_container.pack(fill="x", padx=12, pady=8)
+        button_container.pack(fill="x", padx=12, pady=(4, 8))
         button_container.grid_columnconfigure(0, weight=1)
         button_container.grid_columnconfigure(1, weight=0)
 
@@ -342,7 +348,7 @@ class HapticUIView:
         self.scenario_level_label = ctk.CTkLabel(
             self.image_frame,
             text="SIN POLITICA ACTIVA",
-            font=("Roboto", 16, "bold"),
+            font=("Roboto", 14, "bold"),
             text_color="#00ADB5",
             anchor="w",
             justify="left",
@@ -350,8 +356,8 @@ class HapticUIView:
         self.scenario_level_label.grid(row=0, column=0, padx=(8, 16), pady=(2, 0), sticky="ew")
         self.scenario_title_label = ctk.CTkLabel(
             self.image_frame,
-            text="Escenas cotidianas",
-            font=("Roboto", 24, "bold"),
+            text="Seleccione una política para ver su información",
+            font=("Roboto", 14, "bold"),
             text_color="#EEEEEE",
             anchor="center",
             justify="center",
@@ -573,9 +579,9 @@ class HapticUIView:
         policy = self.displayed_policy
         image_label = self.policy_gallery_image_label
         if policy not in image_files:
-            self.policy_gallery_title_label.configure(
-                text="SELECCIONE UNA POLÍTICA"
-            )
+            # self.policy_gallery_title_label.configure(
+            #     text="SELECCIONE UNA PROPUESTA VIBROTÁCTIL"
+            # )
             self.policy_gallery_current_image = None
             image_label.image = None
             image_label.configure(
@@ -793,7 +799,9 @@ class HapticUIView:
             self._draw_motor_map(None)
             self.motor_policy_description_label.configure(text="")
             self.scenario_level_label.configure(text="SIN POLITICA ACTIVA")
-            self.scenario_title_label.configure(text="Seleccione una política")
+            self.scenario_title_label.configure(
+                text="Seleccione una política para ver su información"
+            )
             self.scenario_description_label.configure(text="")
             self.scenario_support_label.configure(text="ACOMPANAMIENTO HAPTICO")
             self.scenario_response_label.configure(text="")
@@ -812,16 +820,18 @@ class HapticUIView:
         self._draw_motor_map(policy)
         scenario = POLICY_SCENARIOS[policy]
         if isinstance(scenario, (tuple, list)) and len(scenario) == 3:
-            title, description, _ = scenario
+            _, description, _ = scenario
         else:
-            title = POLICY_LABELS[policy]
             description = scenario
         if " Propuesta:" in description:
             activation_text, proposal_text = description.split(" Propuesta:", 1)
         else:
             activation_text = description
             proposal_text = ""
-        self.scenario_title_label.configure(text=title)
+        policy_name = POLICY_LABELS.get(policy, policy)
+        self.scenario_title_label.configure(
+            text=f"Propuesta vibrotáctil activa: {POLICY_LABELS[policy]}"
+        )
         self.scenario_description_label.configure(
             text=activation_text.removeprefix("Activación:").strip()
         )
@@ -865,7 +875,7 @@ class HapticUIView:
 
         if not self.ecg_signal_ok and self.ecg_policy is None:
             waiting_text = (
-                "Sin pulso - selecciona una política"
+                "Sin pulso - Coloquese el sensor en el dedo"
                 if use_mock_visuals and self.ecg_policy is None
                 else "Esperando una señal de pulso..."
             )
