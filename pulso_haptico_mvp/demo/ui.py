@@ -18,8 +18,16 @@ from demo.constants import (
     POLICY_LABELS,
     POLICY_SCENARIOS,
     MOCK_ECG_POLICY_LEVELS,
-    POLICY_COLORS,
+    BUTTON_COLOR,
 )
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+POLICY_IMAGE_FILES = {
+    "awareness": "awareness.jpeg",
+    "reassure": "reassure.jpeg",
+    "breath": "breath.jpeg",
+    "calm_down": "calm_down.jpeg",
+}
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -262,7 +270,6 @@ class HapticUIView:
         policy_grid.grid_columnconfigure((0, 1), weight=1, uniform="policy_col")
 
         self.buttons: Dict[str, ctk.CTkButton] = {}
-        policy_button_color = POLICY_COLORS["reassure"]
         for index, policy in enumerate(VALID_POLICIES):
             button = ctk.CTkButton(
                 policy_grid,
@@ -271,8 +278,8 @@ class HapticUIView:
                 height=46,
                 fg_color="transparent",
                 hover_color="#1f242b",
-                text_color=policy_button_color,
-                border_color=policy_button_color,
+                text_color=BUTTON_COLOR,
+                border_color=BUTTON_COLOR,
                 border_width=2,
                 corner_radius=8,
                 command=lambda selected=policy: self.select_policy_manual(selected),
@@ -480,22 +487,13 @@ class HapticUIView:
         )
         self.policy_gallery_title_label.pack(pady=(18, 12))
 
-        image_files = {
-            "awareness": "static/awareness.jpeg",
-            "reassure": "static/reassure.jpeg",
-            "breath": "static/breath.jpeg",
-            "calm_down": "static/calm_down.jpeg",
-        }
-
-        static_base = Path(__file__).resolve().parent
-
         self.policy_gallery_image_cache = {}
-        for pol, rel_path in image_files.items():
-            img_path = static_base / rel_path
+        for policy, filename in POLICY_IMAGE_FILES.items():
+            img_path = STATIC_DIR / filename
             if img_path.exists():
                 try:
                     pil_img = Image.open(img_path).copy()
-                    self.policy_gallery_image_cache[pol] = ctk.CTkImage(
+                    self.policy_gallery_image_cache[policy] = ctk.CTkImage(
                         light_image=pil_img,
                         dark_image=pil_img,
                         size=(image_width, image_height),
@@ -509,7 +507,7 @@ class HapticUIView:
         self.policy_gallery_image_label.pack(
             fill="both", expand=True, padx=padding_x, pady=(0, padding_y)
         )
-        self._update_policy_gallery_image(image_files, static_base)
+        self._update_policy_gallery_image()
 
         def close_gallery() -> None:
             self.policy_gallery_window = None
@@ -520,26 +518,24 @@ class HapticUIView:
 
         gallery.protocol("WM_DELETE_WINDOW", close_gallery)
 
-    def _get_gallery_logo_image(self, static_base: Path) -> Optional[ctk.CTkImage]:
+    def _get_gallery_logo_image(self) -> Optional[ctk.CTkImage]:
         """Logo para la galería cuando no hay política activa, escalado sin deformar."""
         cached = self.policy_gallery_image_cache.get("__logo__")
         if cached is not None:
             return cached
-        logo_path = static_base / "static" / "logo.jpeg"
+        logo_path = STATIC_DIR / "logo.jpeg"
         try:
             pil_img = Image.open(logo_path).copy()
         except (FileNotFoundError, OSError):
             return None
-        box_w, box_h = getattr(self, "policy_gallery_image_size", (900, 560))
+        box_w, box_h = self.policy_gallery_image_size
         scale = min(box_w / pil_img.width, box_h / pil_img.height)
         size = (max(1, int(pil_img.width * scale)), max(1, int(pil_img.height * scale)))
         logo_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=size)
         self.policy_gallery_image_cache["__logo__"] = logo_img
         return logo_img
 
-    def _update_policy_gallery_image(
-        self, image_files: Dict[str, str], static_base: Path
-    ) -> None:
+    def _update_policy_gallery_image(self) -> None:
         if (
             self.policy_gallery_window is None
             or not self.policy_gallery_window.winfo_exists()
@@ -550,10 +546,10 @@ class HapticUIView:
 
         policy = self.displayed_policy
         image_label = self.policy_gallery_image_label
-        if policy not in image_files:
+        if policy not in POLICY_IMAGE_FILES:
             # Sin política activa (inicio del programa o tras STOP): mostrar el logo.
             self.policy_gallery_title_label.configure(text="SELECCIONE UNA POLÍTICA")
-            logo_img = self._get_gallery_logo_image(static_base)
+            logo_img = self._get_gallery_logo_image()
             if logo_img is not None:
                 image_label.image = logo_img
                 image_label.configure(image=logo_img, compound="center", text="")
@@ -568,7 +564,7 @@ class HapticUIView:
                 )
             return
 
-        image_path = static_base / image_files[policy]
+        image_path = STATIC_DIR / POLICY_IMAGE_FILES[policy]
         self.policy_gallery_title_label.configure(
             text=f"POLÍTICA: {POLICY_LABELS[policy]}"
         )
@@ -798,15 +794,7 @@ class HapticUIView:
     def update_displayed_image(self, policy: Optional[str]) -> None:
         self._cancel_motor_sequence()
         self.displayed_policy = policy
-        self._update_policy_gallery_image(
-            {
-                "awareness": "static/awareness.jpeg",
-                "reassure": "static/reassure.jpeg",
-                "breath": "static/breath.jpeg",
-                "calm_down": "static/calm_down.jpeg",
-            },
-            Path(__file__).resolve().parent,
-        )
+        self._update_policy_gallery_image()
         if policy not in POLICY_SCENARIOS:
             self._draw_motor_map(None)
             self.scenario_title_label.configure(
@@ -827,14 +815,10 @@ class HapticUIView:
 
         self._draw_motor_map(policy)
         scenario = POLICY_SCENARIOS[policy]
-        if isinstance(scenario, (tuple, list)) and len(scenario) == 3:
-            _, description, _ = scenario
+        if " Propuesta:" in scenario:
+            activation_text, proposal_text = scenario.split(" Propuesta:", 1)
         else:
-            description = scenario
-        if " Propuesta:" in description:
-            activation_text, proposal_text = description.split(" Propuesta:", 1)
-        else:
-            activation_text = description
+            activation_text = scenario
             proposal_text = ""
         self.scenario_title_label.configure(
             text=f"Propuesta vibrotáctil activa: {POLICY_LABELS[policy]}"
@@ -858,7 +842,7 @@ class HapticUIView:
         for current, button in self.buttons.items():
             button.configure(
                 border_width=3 if current == policy else 2,
-                border_color=POLICY_COLORS["reassure"],
+                border_color=BUTTON_COLOR,
             )
 
     def _animate_ecg(self) -> None:
@@ -888,7 +872,7 @@ class HapticUIView:
         if not self.ecg_signal_ok and self.ecg_policy is None:
             waiting_text = (
                 "Sin pulso - Coloquese el sensor en el dedo"
-                if use_mock_visuals and self.ecg_policy is None
+                if use_mock_visuals
                 else "Esperando una señal de pulso..."
             )
             self.ecg_canvas.create_line(
