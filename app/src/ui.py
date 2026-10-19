@@ -8,9 +8,9 @@ from typing import Any, Callable, Dict, Optional
 import customtkinter as ctk
 from PIL import Image
 
-from demo.hardware import SerialWorkerThread
-from demo.protocol import build_effective_pattern
-from demo.constants import (
+from src.hardware import SerialWorkerThread
+from src.protocol import build_effective_pattern
+from src.constants import (
     DEMO_STEP_DURATION_SEC,
     SEQUENTIAL_POLICIES,
     BPM_CONFIG,

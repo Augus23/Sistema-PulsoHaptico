@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from demo.config import EffectivePattern
-from demo.constants import POLICY_TO_CODE, TRANSITION_TO_CODE
+from src.config import EffectivePattern
+from src.constants import POLICY_TO_CODE, TRANSITION_TO_CODE
 
 def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))

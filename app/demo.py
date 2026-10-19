@@ -31,10 +31,10 @@ from tkinter import ttk
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
-from demo.protocol import load_catalog
-from demo.hardware import MockArduinoSerial, choose_port_interactively
-from demo.hardware import SerialWorkerThread
-from demo.ui import HapticDemoApp
+from src.protocol import load_catalog
+from src.hardware import MockArduinoSerial, choose_port_interactively
+from src.hardware import SerialWorkerThread
+from src.ui import HapticDemoApp
 
 
 try:
