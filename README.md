@@ -1,2 +1,2 @@
 # Sistema-PulsoHaptico
-Proyecto lifia 2026 Pulso Haptico
+Proyecto LIFIA 2026 Pulso Haptico
